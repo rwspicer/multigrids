@@ -607,9 +607,12 @@ class MultiGrid (object):
             raise IOError("No Raster Metadata Found: cannot save tiff")
         datatype = gdal.GDT_Float32
 
+        # print (projection)
+        
+        # print (transform)
         data = self[grid_id].astype(np.float32)
 
-        raster.save_raster(filename, data, projection, transform, datatype)
+        raster.save_raster(filename, data, transform, projection, datatype)
 
 
 

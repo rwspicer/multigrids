@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [0.4.0] - 2020-
+## [0.4.0] - 2020-11-24
 ### Changed
 - refactored code to use spicebox as a dependency  and to clean up copy and 
   pasted code
