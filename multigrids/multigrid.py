@@ -691,7 +691,7 @@ class MultiGrid (object):
         if location_format == "WGS84":
             location = transforms.from_wgs84(location, projection)
             location = transforms.to_pixel(location, transform).astype(int)
-        elif location_format is "GEO":
+        elif location_format == "GEO":
             location = transforms.to_pixel(location, transform).astype(int)
         # else:  # ROWCOL
         #     pass
@@ -723,8 +723,13 @@ class MultiGrid (object):
         except KeyError:
             view.config['dataset_name'] = 'Unknown zoom to ' + str(loc_orig)
 
-    
-        print ("WARNING: RASTER METADATA NOT PRESERVED WITH ZOOM TO.")
+        raster_meta = self.config['raster_metadata']
+        view_transform = raster.get_zoom_geotransform(
+            raster_meta, location, radius
+        )
+
+
+
         for idx in range(len(self.grids)):
             grid = self.grids[idx].reshape(self.config['grid_shape'])
             zoom = raster.zoom_to(grid, location, radius)
@@ -734,9 +739,60 @@ class MultiGrid (object):
             self.config['mask'], location, radius
         )
 
+        view.config['raster_metadata'] = copy.deepcopy(raster_meta)
+        view.config['raster_metadata']['transform'] = view_transform
+
+
         return view
 
+    def get_max_locations(self, location_format="ROWCOL", verbose=False, top_n = 3, start_at=0):
 
+        max_map = {}
+        transform = self.config['raster_metadata']['transform']
+        projection = self.config['raster_metadata']['projection']
+
+        
+        for idx in range(start_at,len(self.grids)):
+            if verbose:
+                print(idx)
+            grid = self.grids[idx].reshape(self.config['grid_shape'])
+
+            top = np.unique(grid[~np.isnan(grid)])[-1 * top_n:]
+
+            max_map[idx] = {}
+
+            count = top_n
+            if verbose:
+                print(top)
+            for val in top:
+                if verbose:
+                    print(val)
+                locations = np.array(np.where(grid==val)).T
+
+                new_locs = []
+                if location_format != "ROWCOL":
+                    for lix in range(len(locations)): 
+                           
+                        if verbose:
+                            print("geo correcting")
+                        location = locations[lix] 
+                        loc_i = locations[lix] 
+                        if location_format == "WGS84":
+                            location = transforms.to_geo(location, transform)
+                            location = transforms.to_wgs84(location, projection)
+                        elif location_format == "GEO":
+                            location = transforms.to_geo(location, transform)
+                        new_locs.append(list(location)) 
+                        print(lix, loc_i, location) 
+                else: 
+                    new_locs = locations
+
+                max_map[idx][count] = {"value": val, "at": new_locs}
+                count -= 1
+            
+        return max_map
+        
+ 
 
     def get_grids_at_keys(self, keys):
         """return the grids for the given keys
