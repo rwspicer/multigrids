@@ -51,7 +51,17 @@ class TemporalGrid (MultiGrid):
         self.config['num_timesteps'] = self.num_timesteps
         self.config['timestep'] = 0
         self.grid = self.grids[0]
+        self.config['delta_timestep'] = "unknown"
         # self.config['start_timestep'] = 0
+
+    def reset_grid_name_map(self, delta_timestep):
+
+        delta_timestep = delta_timestep.lower()
+        if delta_timestep == "year":
+            self.config['delta_timestep'] = "year"
+            sy = self.config['start_timestep']
+            ny = self.config['num_timesteps']
+            self.config["grid_name_map"] = {"%s" % (sy + y): y for y in range(ny)}
 
     def new(self, *args, **kwargs):
         """Does setup for a new TemporalGrid object

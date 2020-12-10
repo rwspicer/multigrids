@@ -573,19 +573,20 @@ class MultiGrid (object):
 
         
     def save_all_figures(
-            self, dirname, figure_func=figures.default, figure_args={}
+            self, dirname, figure_func=figures.default, figure_args={}, extension='.png'
         ):
         """
         """
-        grids = self.grid_name_map
+        grids = self.config['grid_name_map']
         if grids == {}:
             grids = range(self.num_grids)
 
         for grid in grids:
             filename = os.path.join(
                 dirname, 
-                (self.config["dataset_name"]  + '_' + str(grid) + '.png').replace(' ','_')
+                (self.config["dataset_name"]  + '_' + str(grid) + extension).replace(' ','_')
             )
+            figure_args['title'] = self.config["dataset_name"].replace('-', ' ')  + ' ' + str(grid)
             self.save_figure(grid, filename, figure_func, figure_args)
 
 
@@ -701,6 +702,7 @@ class MultiGrid (object):
 
 
         data = self.grids[0].reshape(self.config['grid_shape'])
+        
         view = raster.zoom_to(data, location, radius)
         n_grids = self.config['num_grids']
         rows, cols = view.shape

@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.5.1] - 2020-12-10
+### Added
+- function for temporal girds to reset grid name map
+
+### Fixed
+- save all figures title bugfix
+
 ## [0.5.0] - 2020-12-02
 ### Added
 - functions to find location of maximum values
