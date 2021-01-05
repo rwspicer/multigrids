@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2020-01-04
+### Added
+- filters function
+
 ## [0.5.1] - 2020-12-10
 ### Added
 - function for temporal girds to reset grid name map
