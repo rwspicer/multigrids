@@ -143,7 +143,20 @@ class TemporalMultiGrid (MultiGrid):
             raise KeyError( 'Not a key for Temporal Multi Grid: '+ str(key))
         # print 'key', access_key, type(access_key)
         # print access_key
-        return self.grids.reshape(self.config['real_shape'])[access_key]
+
+        data = self.grids.reshape(self.config['real_shape'])[access_key]
+
+        _filter = self.filters[self.current_filter] if self.current_filter else 1
+        if _filter == 1:
+            return data
+
+        if data.shape == self.config['grid_shape']:
+            data *= _filter
+        else:
+            for i in range(data.shape[0]):
+                data[i] *= _filter
+
+        return data
 
     def __setitem__ (self ,key, value):
         """ Set item function

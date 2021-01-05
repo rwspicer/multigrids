@@ -105,8 +105,10 @@ class TemporalGrid (MultiGrid):
         else:
             # print (key)
             key -= self.config['start_timestep']
-            # print (key,self.config['start_timestep'])
-        return self.grids.reshape(self.config['real_shape'])[key].reshape(self.config['grid_shape'])
+            
+        return super().__getitem__(key)
+  
+
 
     # def get_grids_at_keys(self,keys):
     #     """return the grids for the given keys

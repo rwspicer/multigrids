@@ -33,6 +33,9 @@ class MultigridConfigError (Exception):
 class MultigridIOError (Exception):
     """Raised during multigrid IO"""
 
+class MultigridFilterError (Exception):
+    """Raised during multigrid Filter ops"""
+
 
 def open_or_create_memmap_grid(filename, mode, dtype, shape):
     """Initialize or open a memory mapped np.array.
@@ -117,9 +120,35 @@ class MultiGrid (object):
             # print('load')
             init_func = self.load
 
-        
+        self.filters = {} 
+        self.current_filter = None
+
         self.config, self.grids = init_func(*args, **kwargs)
         self.config['multigrids_version'] =  __version__
+
+        if "filters" in self.config and not self.config['filters'] is None \
+                and type(args[0]) is str:
+            # print('filters')
+
+            mg_path,name = os.path.split(args[0])
+            name = name[:-4]
+            filter_file = os.path.join(mg_path, name + '.filters.data')
+            # print(filter_file)
+            n = len(self.config['filters'])
+            rows, cols = self.config['grid_shape']
+            # print((n, rows, cols), self.config['data_type'])
+            f_data = np.memmap(
+                filter_file, 
+                mode='r', 
+                dtype=self.config['data_type'],
+                shape = (n, rows, cols)#'z', y, x as it were
+            ) 
+            # print(f_data)
+            self.filters = {}
+            for f in self.config['filters']:
+                c = self.config['filters'][f]
+                self.filters[f] = f_data[c].reshape(rows,cols)
+
 
         try:
             if type(self.config['raster_metadata']) is dict:
@@ -144,9 +173,15 @@ class MultiGrid (object):
     def __del__ (self):
         """deconstructor for class"""
         if hasattr(self, 'config'):
+
             del(self.config)
         if hasattr(self, 'grids'):
             del(self.grids)
+
+        if hasattr(self,' _tempfile_loc'):
+            os.remove(self._tempfile_loc)
+
+            
 
     # def __getattr__(self, attr):
     #     """get attribute, allows access to config dictionary values
@@ -213,7 +248,10 @@ class MultiGrid (object):
         """
         if type(key) in (str,):
             key = self.get_grid_number(key)
-        return self.grids.reshape(self.config['real_shape'])[key].reshape(self.config['grid_shape'])
+
+        _filter = self.filters[self.current_filter] if self.current_filter else 1
+        
+        return self.grids.reshape(self.config['real_shape'])[key].reshape(self.config['grid_shape']) * _filter
 
     def __setitem__(self, key, value):
         """Set item function
@@ -319,6 +357,8 @@ class MultiGrid (object):
         init_data = load_or_use_default(kwargs, 'initial_data', None)
         if not init_data is None:
             grids = init_data.reshape(config['memory_shape'])
+
+        config['filters'] = None
         
         return config, grids 
 
@@ -388,13 +428,45 @@ class MultiGrid (object):
                 shape = self.grids.shape 
             )
             save_file[:] = self.grids[:]
-            del save_file
+            del save_file ## close file
             s_config['filename'] = os.path.split(data_file)[1]
         
         del s_config['memory_shape']
         del s_config['real_shape']
 
         s_config['mode'] = 'r+'
+
+        if self.filters != {}:
+            try:
+                path, filter_file = os.path.split(file)
+            except ValueError:
+                path, filter_file = './', file
+
+            if filter_file[0] == '.':
+                filter_file = '.' + filter_file[1:].split('.')[0] + '.filters.data'
+            else:
+                filter_file = filter_file.split('.')[0] + '.filters.data'
+            filter_file = os.path.join(path,filter_file)
+
+            n = len(self.filters)
+            rows, cols = self.config['grid_shape']
+            f_data = np.memmap(
+                filter_file, 
+                mode='w+', 
+                dtype=s_config['data_type'],
+                shape = (n, rows, cols)#'z', y, x as it were
+            ) 
+
+            # stack filters and create map to index location
+            f_map = {}
+            c = 0
+            for f in self.filters:
+                f_data[c][:] = self.filters[f][:]
+                f_map[f] = c
+
+            del f_data ## close file
+            
+            s_config['filters'] = f_map
 
         with open(file, 'w') as sfile:
             sfile.write('#Saved ' + self.__class__.__name__ + " metadata\n")
@@ -415,6 +487,28 @@ class MultiGrid (object):
             String: int, key value pairs
         """
         return {grid_names[i]: i for i in range(len(grid_names))}   
+
+    def add_filter(self, name, data, force=False):
+        """
+        """
+
+        if name in self.filters and force == False:
+            raise MultigridFilterError("filters contains %s filter" % name)
+
+        if data.shape != self.config['grid_shape']:
+            raise MultigridFilterError("filter shape does not match grid shape")
+
+    
+        self.filters[name] = data
+
+    def set_filter(self, name):
+        """
+        """
+        if name in self.filters or name is None:
+            self.current_filter = name
+        else:
+            raise MultigridFilterError("invalid filter: %s" % name)
+
 
     def setup_internal_memory(self, config):
         """Setup the internal memory representation of grids
@@ -439,6 +533,7 @@ class MultiGrid (object):
         if config['filename'] is None and config['data_model'] == 'memmap':
             # print "a"
             filename = os.path.join(mkdtemp(), 'temp.dat')
+            self._tempfile_loc = filename
         elif not config['filename'] is None and not os.path.exists(filename):
             # print "b", filename
             filename = os.path.split(filename)[1]
