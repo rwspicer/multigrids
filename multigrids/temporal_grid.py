@@ -227,14 +227,58 @@ class TemporalGrid (MultiGrid):
 
         return subset
 
-    def zoom_to(
-            self, location, radius=50, location_format="ROWCOL", verbose=False
-        ):
-        """creates a multigrid containting only the subset_girds
+    def clip_grids(self, extent, location_format="ROWCOL", verbose=False):
+        """
+        Clip the desired extent from the multigrid. Returns a new 
+        Multigrid with the smaller extent.
 
         parameters
         ----------
-        subset_grids: list
+        extent: tuple
+            4 tuple containing top left and bottom right coordinates to clip
+            data to
+
+
+            (row_tr, col_tr, row_bl, col_bl) if location format == "ROWCOL"
+            (east_tr, north_tr, east_bl, north_bl) if location format == "GEO"
+            (Long_tr, Lat_tr, Long_bl, Lat_bl) if location == "WGS84"
+        radius: Int, default 50
+            number of pixels around center to include in zoom
+        location_format: str, default "ROWCOL"
+            "ROWCOl", "GEO", or "WGS84" to indcate if locations are in
+            pixel, map, or WGS84 format
+        verbose: bool, default False
+    
+        returns
+        -------
+        multigrid.Multigrid
+        """
+        view = super().clip_grids(extent, location_format, verbose)
+        view.config['start_timestep'] = self.config['start_timestep']
+        view.config['timestep'] = self.config['start_timestep']
+        return view
+
+    def zoom_to(
+            self, location, radius=50, location_format="ROWCOL", verbose=False
+        ):
+        """zoom in to center location
+
+        parameters
+        ----------
+        location: tuple
+            (row, col) if location format == "ROWCOL"
+            (east, north) if location format == "GEO"
+            (Long, Lat) if location == "WGS84"
+        radius: Int, default 50
+            number of pixels around center to include in zoom
+        location_format: str, default "ROWCOL"
+            "ROWCOl", "GEO", or "WGS84" to indcate if location is in
+            pixel, map, or WGS84 format
+        verbose: bool, default False
+    
+        returns
+        -------
+        multigrid.TemporalGrid
         """
         view = super().zoom_to(location, radius, location_format, verbose)
         view.config['start_timestep'] = self.config['start_timestep']

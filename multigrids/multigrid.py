@@ -767,16 +767,118 @@ class MultiGrid (object):
             features += list(temp[mask])
         return np.array(features)
 
-    def clip_grids(self, extent):
+    def clip_grids(self, extent, location_format="ROWCOL", verbose=False):
         """Clip the desired extent from the multigrid. Returns a new 
         Multigrid with the smaller extent.
+
+        parameters
+        ----------
+        extent: tuple
+            4 tuple containing top left and bottom right coordinates to clip
+            data to
+
+
+            (row_tr, col_tr, row_bl, col_bl) if location format == "ROWCOL"
+            (east_tr, north_tr, east_bl, north_bl) if location format == "GEO"
+            (Long_tr, Lat_tr, Long_bl, Lat_bl) if location == "WGS84"
+        radius: Int, default 50
+            number of pixels around center to include in zoom
+        location_format: str, default "ROWCOL"
+            "ROWCOl", "GEO", or "WGS84" to indcate if locations are in
+            pixel, map, or WGS84 format
+        verbose: bool, default False
+    
+        returns
+        -------
+        multigrid.Multigrid
         """
-        raise NotImplementedError('This needs to be implemented eventually')
+        top_l = extent[0], extent[1]
+        bottom_r = extent[2], extent[3]
+
+        transform = self.config['raster_metadata']['transform']
+        projection = self.config['raster_metadata']['projection']
+
+        if location_format == "WGS84":
+            top_l = transforms.from_wgs84(top_l, projection)
+            top_l = transforms.to_pixel(top_l, transform).astype(int)
+
+            bottom_r = transforms.from_wgs84(bottom_r, projection)
+            bottom_r = transforms.to_pixel(bottom_r, transform).astype(int)
+        elif location_format == "GEO":
+            top_l = transforms.to_pixel(top_l, transform).astype(int)
+            bottom_r = transforms.to_pixel(bottom_r, transform).astype(int)
+
+        if verbose:
+            print ('top left', top_l)
+            print ('bottom right', bottom_r)
+
+        data = self.grids[0].reshape(self.config['grid_shape'])
+        
+        view = raster.zoom_box(data, top_l, bottom_r)
+        n_grids = self.config['num_grids']
+        rows, cols = view.shape
+        
+        view = type(self)(
+            rows, cols, n_grids,
+            data_type=self.config['data_type'],
+        )
+        view.config['grid_name_map'] = self.config['grid_name_map']
+
+        try:
+            view.config['description'] = \
+                self.config['description'] + ' clipped to' + str(extent)
+        except KeyError:
+             view.config['description'] = + 'Unknown clipped to' + str(extent)
+        
+        try:
+            view.config['dataset_name'] = \
+                self.config['dataset_name'] + ' clipped to' + str(extent)
+        except KeyError:
+            view.config['dataset_name'] = 'Unknown clipped to' + str(extent)
+
+        raster_meta = self.config['raster_metadata']
+        view_transform = raster.get_zoom_box_geotransform(
+            raster_meta, top_l, bottom_r
+        )
+
+
+
+        for idx in range(len(self.grids)):
+            grid = self.grids[idx].reshape(self.config['grid_shape'])
+            zoom = raster.zoom_box(grid, top_l, bottom_r)
+            view.grids[idx][:] = zoom.flatten()
+
+        view.config['mask'] = raster.zoom_box(
+            self.config['mask'], top_l, bottom_r
+        )
+
+        view.config['raster_metadata'] = copy.deepcopy(raster_meta)
+        view.config['raster_metadata']['transform'] = view_transform
+
+
+        return view
 
     def zoom_to(
             self, location, radius=50, location_format="ROWCOL", verbose=False
         ):
-        """
+        """zoom in to center location
+
+        parameters
+        ----------
+        location: tuple
+            (row, col) if location format == "ROWCOL"
+            (east, north) if location format == "GEO"
+            (Long, Lat) if location == "WGS84"
+        radius: Int, default 50
+            number of pixels around center to include in zoom
+        location_format: str, default "ROWCOL"
+            "ROWCOl", "GEO", or "WGS84" to indcate if location is in
+            pixel, map, or WGS84 format
+        verbose: bool, default False
+    
+        returns
+        -------
+        multigrid.Multigrid
         """
         location = np.array(location).reshape((2,))
         loc_orig = copy.deepcopy(location)

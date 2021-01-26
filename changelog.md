@@ -1,7 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [0.6.0] - 2020-01-04
+## [0.6.1] - 2021-01-26
+### Added
+- clip_grids implementation
+
+### Updated
+- docs for zoom_to
+
+
+## [0.6.0] - 2021-01-04
 ### Added
 - filters function
 
