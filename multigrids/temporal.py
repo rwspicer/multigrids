@@ -1,6 +1,7 @@
 from .multigrid import MultiGrid
 import numpy as np
 import yaml
+import os
 
 from . import common, figures
 import matplotlib.pyplot as plt
@@ -355,6 +356,19 @@ class TemporalMultiGrid (MultiGrid):
         fig = figure_func(data, figure_args)
         plt.savefig(filename)
         plt.close()
+
+    def save_all_subgrid_figures(
+            self, dirname, subgrid, figure_func=figures.default, figure_args={}, extension='.png'
+        ):
+        """
+        """
+        for ts in self.get_range():
+            filename = os.path.join(
+                dirname, 
+                (self.config["dataset_name"]  + '_' + subgrid + '_' + str(ts) + extension).replace(' ','_')
+            )
+            figure_args['title'] = self.config["dataset_name"].replace('-', ' ')  + ' ' + str(ts)
+            self.save_figure(subgrid, ts, filename, figure_func, figure_args)
 
     def show_figure(self, grid_id, ts, figure_func=figures.default, figure_args={}, data=None):
         """
