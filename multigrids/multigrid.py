@@ -489,7 +489,18 @@ class MultiGrid (object):
         return {grid_names[i]: i for i in range(len(grid_names))}   
 
     def add_filter(self, name, data, force=False):
-        """
+        """add a filter to the data set
+
+        Parameters
+        ----------
+        name: str
+            name used to set/ access fileter
+        data: np.array 
+            filter of shape config['grid_shape'] is used as multiplier 
+            by getter functions with filters is set via set_filter() call
+        force: bool,  default False
+            if True existing fliters named `name` are overwritten
+        
         """
 
         if name in self.filters and force == False:
