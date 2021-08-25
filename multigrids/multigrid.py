@@ -952,8 +952,42 @@ class MultiGrid (object):
         view.config['raster_metadata'] = copy.deepcopy(raster_meta)
         view.config['raster_metadata']['transform'] = view_transform
 
+        for filter in self.config['filters']:
+            filter_data = self.filters[filter]
+            filter_data = raster.zoom_to(filter_data, location, radius)
+            view.add_filter(filter, filter_data )
+
 
         return view
+
+    def at(self, location, radius=0, location_format="ROWCOL", verbose=False):
+        """
+        """
+        location = np.array(location).reshape((2,))
+        loc_orig = copy.deepcopy(location)
+
+        transform = self.config['raster_metadata']['transform']
+        projection = self.config['raster_metadata']['projection']
+
+        if location_format == "WGS84":
+            location = transforms.from_wgs84(location, projection)
+            location = transforms.to_pixel(location, transform).astype(int)
+        elif location_format == "GEO":
+            location = transforms.to_pixel(location, transform).astype(int)
+        # else:  # ROWCOL
+        #     pass
+
+        if verbose:
+            print(location)
+
+        zoom_ts = []
+
+        for idx in range(len(self.grids)):
+            ## TODO imporove speed with better indexing
+            grid = self.grids[idx].reshape(self.config['grid_shape'])
+            zoom = raster.zoom_to(grid, location, radius)
+            zoom_ts.append(zoom)
+        return np.array(zoom_ts)
 
     def get_max_locations(self, location_format="ROWCOL", verbose=False, top_n = 3, start_at=0):
 
