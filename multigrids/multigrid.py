@@ -866,6 +866,11 @@ class MultiGrid (object):
         view.config['raster_metadata'] = copy.deepcopy(raster_meta)
         view.config['raster_metadata']['transform'] = view_transform
 
+        for filter in self.config['filters']:
+            filter_data = self.filters[filter]
+            filter_data = raster.zoom_box(filter_data, top_l, bottom_r)
+            view.add_filter(filter, filter_data )
+
 
         return view
 
