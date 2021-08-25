@@ -1108,9 +1108,20 @@ class MultiGrid (object):
         except KeyError:
             subset.config['dataset_name'] = 'Unknown subset.'
 
-        
+        ngnm = {}
         for idx, grid in enumerate(subset_grids):
-            subset[idx][:] = self[grid][:]
+            # print(self[grid][:])
+            # print(idx)
+            subset[idx] = self[grid][:]
+            ngnm[grid] = int(idx)
+
+
+
+        subset.filters = self.filters
+        subset.config['filters'] = self.config['filters']
+        subset.config['grid_name_map'] = ngnm 
+
+        subset.config['raster_metadata'] = self.config['raster_metadata'] 
 
         return subset
         
