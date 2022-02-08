@@ -583,6 +583,10 @@ class MultiGrid (object):
         """
         return (config['num_grids'], 
             config['grid_shape'][0] * config['grid_shape'][1])
+        
+    # def set_cell_value (self,val, key, row, col):
+    #     gn = self.get_grid_number(key)
+    #     self.grids[gn].reshape[self.config['real_shape']][row,col]=val
 
     def get_real_shape (self, config):
         """Construct the shape that represents the real shape of the 
