@@ -782,7 +782,19 @@ class MultiGrid (object):
         return np.array(features)
 
     def clip_grids_translate(self, extent, temp_dir='.clip_temp/'):
-        """
+        """Clip grids using gdal.Translate
+
+        Parameters
+        ----------
+        extent: tuple
+            (minX, maxY, maxX, minY)
+        temp_dir: path
+            path to store temp data at
+        
+        Returns
+        -------
+        type(self)
+            a grid object of the same type as the current grid
         """
         from .tools import load_and_create
         os.makedirs(temp_dir)
@@ -790,22 +802,18 @@ class MultiGrid (object):
         gdal_type = raster.numpy_type_lookup(self.grids.dtype)
         
         name = 'clipped'
-
+        
         self.save_all_as_geotiff(temp_dir, **{'base_filename':'full'})
 
         files = sorted(glob.glob(os.path.join(temp_dir, 'full*.tif')))
-        # return 
+
         for idx, in_file in enumerate(files):
-            
             out_name = os.path.split(in_file)[1]
             out_name = out_name.replace('full','clipped')
             out_file = os.path.join(temp_dir, out_name)
             print(idx, in_file, out_file)
             raster.clip_raster(in_file, out_file, extent, datatpye=gdal_type)
-
             os.remove(in_file)
-
-
 
         files = sorted(glob.glob(os.path.join(temp_dir,'%s*.tif' % name)))
         d, md = raster.load_raster(files[0])
@@ -818,7 +826,6 @@ class MultiGrid (object):
             "verbose": True}
         cp = {
             'name': self.config['dataset_name'] + '- sub area', 
-            # 'description': self.config['description'] + '- sub area: ' + name, 
             'grid_names': list(self.config['grid_name_map'].keys()), 
             'start_timestep': 
                 self.config['start_timestep'] if 'start_timestep' in self.config else None, 
@@ -836,9 +843,12 @@ class MultiGrid (object):
 
     def clip_grids(self, extent, location_format="ROWCOL", verbose=False):
         """Clip the desired extent from the multigrid. Returns a new 
-        Multigrid with the smaller extent.
+        Multigrid with the smaller extent.  
 
-        parameters
+        This function is less accurate than clip_grids_translate which
+        which should be used instead in most cases
+
+        Parameters
         ----------
         extent: tuple
             4 tuple containing top left and bottom right coordinates to clip
@@ -853,7 +863,7 @@ class MultiGrid (object):
             pixel, map, or WGS84 format
         verbose: bool, default False
     
-        returns
+        Returns
         -------
         multigrid.Multigrid
         """
@@ -938,7 +948,22 @@ class MultiGrid (object):
     def clip_to_shape(
             self, shape, name='subarea', temp_dir='./temp', warp_options = {}
         ):
-        """Clip the grid to a shape (from a vector file)
+        """Clip the grid to a shape (from a vector file) using gdal warp
+
+        Parameters
+        ----------
+        shape: path
+            path to vector file with shape to clip to
+        name: str
+            Name for files, and sub area
+        temp_dir: path
+            path to store temp data at
+        warp_options:
+            Options to pass to gdal warp
+
+        Returns
+        -------
+        multigrid.Multigrid
         """
         from .tools import load_and_create
         # load_and_create
@@ -959,7 +984,7 @@ class MultiGrid (object):
             os.remove(in_file)
 
         files = sorted(glob.glob(os.path.join(temp_dir,'%s*.tif' % name)))
-        d, md = raster.load_raster(files[0])
+        md = raster.load_raster(files[0])[1]
         
         lp = {
             "method": 'tiff',
@@ -992,7 +1017,7 @@ class MultiGrid (object):
         ):
         """zoom in to center location
 
-        parameters
+        Parameters
         ----------
         location: tuple
             (row, col) if location format == "ROWCOL"
@@ -1005,7 +1030,7 @@ class MultiGrid (object):
             pixel, map, or WGS84 format
         verbose: bool, default False
     
-        returns
+        Returns
         -------
         multigrid.Multigrid
         """
@@ -1234,7 +1259,7 @@ class MultiGrid (object):
     def create_subset(self, subset_grids):
         """creates a multigrid containting only the subset_girds
 
-        parameters
+        Parameters
         ----------
         subset_grids: list
         """
