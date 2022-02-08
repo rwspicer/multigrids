@@ -1,6 +1,21 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.6.2] - 2021-02-08
+### Added
+- Multigrid.clip_polygon_raster that clips to a shape in a vector file
+- Multigrid.clip_raster_translate that clips to extend using gdal translate
+
+### Updated
+- Cleanup documentation
+- Cleanup imports
+- tools.tiffs_to_array creates a memory mapped array 
+- tools.tiffs_to_array  changed messages provided if verbose is true 
+
+## fixed
+- Multigrid.clip_raster fixes way raster.zoom_box is called
+- Multigrids filters feature is fixed
+
 ## [0.6.1] - 2021-01-26
 ### Added
 - clip_grids implementation

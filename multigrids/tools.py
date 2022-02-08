@@ -1,27 +1,23 @@
 """
-MultiGtid Tools
+MultiGrid Tools
 ---------------
 
-tools.py
+Tools for creation/editing of multigrid classes
 
 """
-from . import multigrid
-from . import grid
-from . import temporal_grid
-from . import temporal
-
-
-import numpy as np
 import os
 from tempfile import mkdtemp
-import yaml
-import copy
-import sys
+import glob
+
+import numpy as np
 import matplotlib.pyplot as plt
 
 from spicebox import raster
 
-import glob
+from . import multigrid
+from . import grid
+from . import temporal_grid
+from . import temporal
 
 
 class MultigridCreationError (Exception):
@@ -68,9 +64,6 @@ def create(data,
         and 'transform' keys with values being a str (OpenGIS Well Known 
         Text strings) and Tuple (x_origin,pixel_width,rotation_x,
         y_origin,rotation_y,pixel height)
-
-    
-
 
     Returns
     -------
@@ -119,8 +112,6 @@ def create(data,
     return mg
 
 
-
-
 def from_yaml (yaml_file):
     """
     create multigrid from yaml description
@@ -141,7 +132,7 @@ def get_raster_metadata(raster_file):
     dict
         contains raster 'projection', and 'transform' as values
     """
-    data, md = raster.load_raster(raster_file)
+    md = raster.load_raster(raster_file)[1]
     return md
 
 
@@ -175,7 +166,11 @@ def tiffs_to_array (
     """
     if directory is None:
         raise IOError("directory dose not exist")
-
+    if verbose:
+        print(
+            "Directory and wild card being used:", 
+            directory, file_name_structure
+        )
     path = os.path.join(directory, file_name_structure)
     files = glob.glob(path)
     files = sort_func(files)
@@ -184,7 +179,6 @@ def tiffs_to_array (
         print ("Displaying First  15 sorted files:")
         for f in files[:15]:
             print('\t', f)
-
         print ("Displaying last  15 sorted files:")
         for f in files[-15:]:
             print('\t', f)
@@ -200,11 +194,16 @@ def tiffs_to_array (
             shape = len(files), rows, cols
             if verbose:
                 print('\tArray shape:', shape)
-            array = np.zeros(shape) - np.nan  #initialize to np.nan
-        
+
+            ## TODO: add init data?
+            ## TODO: add option to create as an array
+            array = np.memmap(os.path.join(directory, 'temp.mgdata'),
+                shape=shape, dtype=np.float32, mode='w+') 
+                
         array[ix][:] = grid
         
     return array 
+
 
 def load_and_create( load_params = {}, create_params = {}):
     """loads data and creates a multigrid
@@ -221,8 +220,6 @@ def load_and_create( load_params = {}, create_params = {}):
     -------
     Grid, MultiGrid, TemporalGrid, or TemporalMultiGrid
     """
-   
-
     if load_params['method'] == 'tiff':
         tiff_params = {
             "directory": None, # have to supply a directory
@@ -235,11 +232,9 @@ def load_and_create( load_params = {}, create_params = {}):
         load_function = tiffs_to_array
         
     else:
-        return False
-    
+        return False 
     
     data = load_function(**load_params)
-    
     grid = create(data, **create_params)
 
     return grid

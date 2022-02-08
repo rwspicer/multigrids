@@ -7,25 +7,26 @@ multigrid.py
 This file contains the MultiGrid class
 
 """
-import numpy as np
+
 import os
-from tempfile import mkdtemp
-import yaml
+import glob
 import copy
-import sys
+from tempfile import mkdtemp
+
+import yaml
+import numpy as np
 import matplotlib.pyplot as plt
-from spicebox import raster, transforms
-
-from .__metadata__ import __version__
-
-from . import figures
-
-from .common import load_or_use_default, GridSizeMismatchError
-
 try: 
     import gdal
 except ImportError:
     gdal = None
+
+from spicebox import raster, transforms
+
+from .__metadata__ import __version__
+from . import figures
+
+from .common import load_or_use_default, GridSizeMismatchError
 
 class MultigridConfigError (Exception):
     """Raised if a multgrid class is missing its configuration"""
@@ -126,28 +127,30 @@ class MultiGrid (object):
         self.config, self.grids = init_func(*args, **kwargs)
         self.config['multigrids_version'] =  __version__
 
-        if "filters" in self.config and not self.config['filters'] is None \
-                and type(args[0]) is str:
-            # print('filters')
 
-            mg_path,name = os.path.split(args[0])
-            name = name[:-4]
-            filter_file = os.path.join(mg_path, name + '.filters.data')
-            # print(filter_file)
-            n = len(self.config['filters'])
-            rows, cols = self.config['grid_shape']
-            # print((n, rows, cols), self.config['data_type'])
-            f_data = np.memmap(
-                filter_file, 
-                mode='r', 
-                dtype=self.config['data_type'],
-                shape = (n, rows, cols)#'z', y, x as it were
-            ) 
-            # print(f_data)
-            self.filters = {}
-            for f in self.config['filters']:
-                c = self.config['filters'][f]
-                self.filters[f] = f_data[c].reshape(rows,cols)
+
+        if "filters" in self.config and type(args[0]) is str:
+            if (not self.config['filters'] is None) and \
+                    self.config['filters'] != []:
+                print('filters', self.config['filters'])
+                mg_path,name = os.path.split(args[0])
+                name = name[:-4]
+                filter_file = os.path.join(mg_path, name + '.filters.data')
+                # print(filter_file)
+                n = len(self.config['filters'])
+                rows, cols = self.config['grid_shape']
+                # print((n, rows, cols), self.config['data_type'])
+                f_data = np.memmap(
+                    filter_file, 
+                    mode='r', 
+                    dtype=self.config['data_type'],
+                    shape = (n, rows, cols)#'z', y, x as it were
+                ) 
+                # print(f_data)
+                self.filters = {}
+                for f in self.config['filters']:
+                    c = self.config['filters'][f]
+                    self.filters[f] = f_data[c].reshape(rows,cols)
 
 
         try:
@@ -580,6 +583,10 @@ class MultiGrid (object):
         """
         return (config['num_grids'], 
             config['grid_shape'][0] * config['grid_shape'][1])
+        
+    # def set_cell_value (self,val, key, row, col):
+    #     gn = self.get_grid_number(key)
+    #     self.grids[gn].reshape[self.config['real_shape']][row,col]=val
 
     def get_real_shape (self, config):
         """Construct the shape that represents the real shape of the 
@@ -778,11 +785,74 @@ class MultiGrid (object):
             features += list(temp[mask])
         return np.array(features)
 
+    def clip_grids_translate(self, extent, temp_dir='.clip_temp/'):
+        """Clip grids using gdal.Translate
+
+        Parameters
+        ----------
+        extent: tuple
+            (minX, maxY, maxX, minY)
+        temp_dir: path
+            path to store temp data at
+        
+        Returns
+        -------
+        type(self)
+            a grid object of the same type as the current grid
+        """
+        from .tools import load_and_create
+        os.makedirs(temp_dir)
+
+        gdal_type = raster.numpy_type_lookup(self.grids.dtype)
+        
+        name = 'clipped'
+        
+        self.save_all_as_geotiff(temp_dir, **{'base_filename':'full'})
+
+        files = sorted(glob.glob(os.path.join(temp_dir, 'full*.tif')))
+
+        for idx, in_file in enumerate(files):
+            out_name = os.path.split(in_file)[1]
+            out_name = out_name.replace('full','clipped')
+            out_file = os.path.join(temp_dir, out_name)
+            print(idx, in_file, out_file)
+            raster.clip_raster(in_file, out_file, extent, datatpye=gdal_type)
+            os.remove(in_file)
+
+        files = sorted(glob.glob(os.path.join(temp_dir,'%s*.tif' % name)))
+        d, md = raster.load_raster(files[0])
+        
+        lp = {
+            "method": 'tiff',
+            "directory": temp_dir, # have to supply a directory
+            "file_name_structure": '%s_*.tif' % name,
+            "sort_func": sorted, 
+            "verbose": True}
+        cp = {
+            'name': self.config['dataset_name'] + '- sub area', 
+            'grid_names': list(self.config['grid_name_map'].keys()), 
+            'start_timestep': 
+                self.config['start_timestep'] if 'start_timestep' in self.config else None, 
+            'raster_metadata': md
+        }
+
+        rv = load_and_create(lp, cp)
+        rv.config['description'] = 'extent of area: ' + str(extent)
+        files = sorted(glob.glob(os.path.join(temp_dir,'*')))
+        for file in files:
+            os.remove(file)
+
+        os.rmdir(temp_dir)
+        return rv 
+
     def clip_grids(self, extent, location_format="ROWCOL", verbose=False):
         """Clip the desired extent from the multigrid. Returns a new 
-        Multigrid with the smaller extent.
+        Multigrid with the smaller extent.  
 
-        parameters
+        This function is less accurate than clip_grids_translate which
+        which should be used instead in most cases
+
+        Parameters
         ----------
         extent: tuple
             4 tuple containing top left and bottom right coordinates to clip
@@ -792,14 +862,12 @@ class MultiGrid (object):
             (row_tr, col_tr, row_bl, col_bl) if location format == "ROWCOL"
             (east_tr, north_tr, east_bl, north_bl) if location format == "GEO"
             (Long_tr, Lat_tr, Long_bl, Lat_bl) if location == "WGS84"
-        radius: Int, default 50
-            number of pixels around center to include in zoom
         location_format: str, default "ROWCOL"
             "ROWCOl", "GEO", or "WGS84" to indcate if locations are in
             pixel, map, or WGS84 format
         verbose: bool, default False
     
-        returns
+        Returns
         -------
         multigrid.Multigrid
         """
@@ -819,13 +887,16 @@ class MultiGrid (object):
             top_l = transforms.to_pixel(top_l, transform).astype(int)
             bottom_r = transforms.to_pixel(bottom_r, transform).astype(int)
 
+        
         if verbose:
             print ('top left', top_l)
             print ('bottom right', bottom_r)
 
         data = self.grids[0].reshape(self.config['grid_shape'])
         
-        view = raster.zoom_box(data, top_l, bottom_r)
+        view = raster.zoom_box(
+            data, copy.deepcopy(top_l), copy.deepcopy(bottom_r)
+        )
         n_grids = self.config['num_grids']
         rows, cols = view.shape
         
@@ -834,12 +905,11 @@ class MultiGrid (object):
             data_type=self.config['data_type'],
         )
         view.config['grid_name_map'] = self.config['grid_name_map']
-
         try:
             view.config['description'] = \
                 self.config['description'] + ' clipped to' + str(extent)
         except KeyError:
-             view.config['description'] = + 'Unknown clipped to' + str(extent)
+            view.config['description'] = 'Unknown clipped to' + str(extent)
         
         try:
             view.config['dataset_name'] = \
@@ -856,7 +926,9 @@ class MultiGrid (object):
 
         for idx in range(len(self.grids)):
             grid = self.grids[idx].reshape(self.config['grid_shape'])
-            zoom = raster.zoom_box(grid, top_l, bottom_r)
+            zoom = raster.zoom_box(
+                grid, copy.deepcopy(top_l), copy.deepcopy(bottom_r)
+            )
             view.grids[idx][:] = zoom.flatten()
 
         view.config['mask'] = raster.zoom_box(
@@ -866,15 +938,90 @@ class MultiGrid (object):
         view.config['raster_metadata'] = copy.deepcopy(raster_meta)
         view.config['raster_metadata']['transform'] = view_transform
 
+        for filter in self.config['filters']:
+            filter_data = self.filters[filter]
+            filter_data = raster.zoom_box(
+                filter_data, 
+                copy.deepcopy(top_l), copy.deepcopy(bottom_r)
+            )
+            view.add_filter(filter, filter_data )
+
 
         return view
+
+    def clip_to_shape(
+            self, shape, name='subarea', temp_dir='./temp', warp_options = {}
+        ):
+        """Clip the grid to a shape (from a vector file) using gdal warp
+
+        Parameters
+        ----------
+        shape: path
+            path to vector file with shape to clip to
+        name: str
+            Name for files, and sub area
+        temp_dir: path
+            path to store temp data at
+        warp_options:
+            Options to pass to gdal warp
+
+        Returns
+        -------
+        multigrid.Multigrid
+        """
+        from .tools import load_and_create
+        # load_and_create
+        # return
+        # try: # add exception?
+        os.makedirs(temp_dir)
+       
+
+        self.save_all_as_geotiff(temp_dir, **{'base_filename':'full'})
+
+        files = sorted(glob.glob(os.path.join(temp_dir, 'full*.tif')))
+        # return 
+        for idx, in_file in enumerate(files):
+            out_file = os.path.join(temp_dir, '%s_%i.tif' % (name, idx) )
+            
+            raster.clip_polygon_raster(in_file, out_file, shape, **warp_options)
+
+            os.remove(in_file)
+
+        files = sorted(glob.glob(os.path.join(temp_dir,'%s*.tif' % name)))
+        md = raster.load_raster(files[0])[1]
+        
+        lp = {
+            "method": 'tiff',
+            "directory": temp_dir, # have to supply a directory
+            "file_name_structure": '%s_*.tif' % name,
+            "sort_func": sorted, 
+            "verbose": False}
+        cp = {
+            'name': self.config['dataset_name'] + '- sub area: ' + name, 
+            # 'description': self.config['description'] + '- sub area: ' + name, 
+            'grid_names': list(self.config['grid_name_map'].keys()), 
+            'start_timestep': 
+                self.config['start_timestep'] if 'start_timestep' in self.config else None, 
+            'raster_metadata': md
+        }
+
+        rv = load_and_create(lp, cp)
+        
+        files = sorted(glob.glob(os.path.join(temp_dir,'*')))
+        for file in files:
+            os.remove(file)
+
+        os.rmdir(temp_dir)
+        return rv 
+        
+
 
     def zoom_to(
             self, location, radius=50, location_format="ROWCOL", verbose=False
         ):
         """zoom in to center location
 
-        parameters
+        Parameters
         ----------
         location: tuple
             (row, col) if location format == "ROWCOL"
@@ -887,7 +1034,7 @@ class MultiGrid (object):
             pixel, map, or WGS84 format
         verbose: bool, default False
     
-        returns
+        Returns
         -------
         multigrid.Multigrid
         """
@@ -952,8 +1099,42 @@ class MultiGrid (object):
         view.config['raster_metadata'] = copy.deepcopy(raster_meta)
         view.config['raster_metadata']['transform'] = view_transform
 
+        for filter in self.config['filters']:
+            filter_data = self.filters[filter]
+            filter_data = raster.zoom_to(filter_data, location, radius)
+            view.add_filter(filter, filter_data )
+
 
         return view
+
+    def at(self, location, radius=0, location_format="ROWCOL", verbose=False):
+        """
+        """
+        location = np.array(location).reshape((2,))
+        loc_orig = copy.deepcopy(location)
+
+        transform = self.config['raster_metadata']['transform']
+        projection = self.config['raster_metadata']['projection']
+
+        if location_format == "WGS84":
+            location = transforms.from_wgs84(location, projection)
+            location = transforms.to_pixel(location, transform).astype(int)
+        elif location_format == "GEO":
+            location = transforms.to_pixel(location, transform).astype(int)
+        # else:  # ROWCOL
+        #     pass
+
+        if verbose:
+            print(location)
+
+        zoom_ts = []
+
+        for idx in range(len(self.grids)):
+            ## TODO imporove speed with better indexing
+            grid = self.grids[idx].reshape(self.config['grid_shape'])
+            zoom = raster.zoom_to(grid, location, radius)
+            zoom_ts.append(zoom)
+        return np.array(zoom_ts)
 
     def get_max_locations(self, location_format="ROWCOL", verbose=False, top_n = 3, start_at=0):
 
@@ -1082,7 +1263,7 @@ class MultiGrid (object):
     def create_subset(self, subset_grids):
         """creates a multigrid containting only the subset_girds
 
-        parameters
+        Parameters
         ----------
         subset_grids: list
         """
@@ -1108,9 +1289,20 @@ class MultiGrid (object):
         except KeyError:
             subset.config['dataset_name'] = 'Unknown subset.'
 
-        
+        ngnm = {}
         for idx, grid in enumerate(subset_grids):
-            subset[idx][:] = self[grid][:]
+            # print(self[grid][:])
+            # print(idx)
+            subset[idx] = self[grid][:]
+            ngnm[grid] = int(idx)
+
+
+
+        subset.filters = self.filters
+        subset.config['filters'] = self.config['filters']
+        subset.config['grid_name_map'] = ngnm 
+
+        subset.config['raster_metadata'] = self.config['raster_metadata'] 
 
         return subset
         
