@@ -127,28 +127,30 @@ class MultiGrid (object):
         self.config, self.grids = init_func(*args, **kwargs)
         self.config['multigrids_version'] =  __version__
 
-        if "filters" in self.config and not self.config['filters'] is None \
-                and type(args[0]) is str:
-            # print('filters')
 
-            mg_path,name = os.path.split(args[0])
-            name = name[:-4]
-            filter_file = os.path.join(mg_path, name + '.filters.data')
-            # print(filter_file)
-            n = len(self.config['filters'])
-            rows, cols = self.config['grid_shape']
-            # print((n, rows, cols), self.config['data_type'])
-            f_data = np.memmap(
-                filter_file, 
-                mode='r', 
-                dtype=self.config['data_type'],
-                shape = (n, rows, cols)#'z', y, x as it were
-            ) 
-            # print(f_data)
-            self.filters = {}
-            for f in self.config['filters']:
-                c = self.config['filters'][f]
-                self.filters[f] = f_data[c].reshape(rows,cols)
+
+        if "filters" in self.config and type(args[0]) is str:
+            if (not self.config['filters'] is None) and \
+                    self.config['filters'] != []:
+                print('filters', self.config['filters'])
+                mg_path,name = os.path.split(args[0])
+                name = name[:-4]
+                filter_file = os.path.join(mg_path, name + '.filters.data')
+                # print(filter_file)
+                n = len(self.config['filters'])
+                rows, cols = self.config['grid_shape']
+                # print((n, rows, cols), self.config['data_type'])
+                f_data = np.memmap(
+                    filter_file, 
+                    mode='r', 
+                    dtype=self.config['data_type'],
+                    shape = (n, rows, cols)#'z', y, x as it were
+                ) 
+                # print(f_data)
+                self.filters = {}
+                for f in self.config['filters']:
+                    c = self.config['filters'][f]
+                    self.filters[f] = f_data[c].reshape(rows,cols)
 
 
         try:
