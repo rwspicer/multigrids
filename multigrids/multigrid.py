@@ -935,6 +935,58 @@ class MultiGrid (object):
 
         return view
 
+    def clip_to_shape(
+            self, shape, name='subarea', temp_dir='./temp', warp_options = {}
+        ):
+        """Clip the grid to a shape (from a vector file)
+        """
+        from .tools import load_and_create
+        # load_and_create
+        # return
+        # try: # add exception?
+        os.makedirs(temp_dir)
+       
+
+        self.save_all_as_geotiff(temp_dir, **{'base_filename':'full'})
+
+        files = sorted(glob.glob(os.path.join(temp_dir, 'full*.tif')))
+        # return 
+        for idx, in_file in enumerate(files):
+            out_file = os.path.join(temp_dir, '%s_%i.tif' % (name, idx) )
+            
+            raster.clip_polygon_raster(in_file, out_file, shape, **warp_options)
+
+            os.remove(in_file)
+
+        files = sorted(glob.glob(os.path.join(temp_dir,'%s*.tif' % name)))
+        d, md = raster.load_raster(files[0])
+        
+        lp = {
+            "method": 'tiff',
+            "directory": temp_dir, # have to supply a directory
+            "file_name_structure": '%s_*.tif' % name,
+            "sort_func": sorted, 
+            "verbose": False}
+        cp = {
+            'name': self.config['dataset_name'] + '- sub area: ' + name, 
+            # 'description': self.config['description'] + '- sub area: ' + name, 
+            'grid_names': list(self.config['grid_name_map'].keys()), 
+            'start_timestep': 
+                self.config['start_timestep'] if 'start_timestep' in self.config else None, 
+            'raster_metadata': md
+        }
+
+        rv = load_and_create(lp, cp)
+        
+        files = sorted(glob.glob(os.path.join(temp_dir,'*')))
+        for file in files:
+            os.remove(file)
+
+        os.rmdir(temp_dir)
+        return rv 
+        
+
+
     def zoom_to(
             self, location, radius=50, location_format="ROWCOL", verbose=False
         ):
