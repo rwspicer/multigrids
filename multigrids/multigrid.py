@@ -7,25 +7,26 @@ multigrid.py
 This file contains the MultiGrid class
 
 """
-import numpy as np
+
 import os
-from tempfile import mkdtemp
-import yaml
+import glob
 import copy
-import sys
+from tempfile import mkdtemp
+
+import yaml
+import numpy as np
 import matplotlib.pyplot as plt
-from spicebox import raster, transforms
-
-from .__metadata__ import __version__
-
-from . import figures
-
-from .common import load_or_use_default, GridSizeMismatchError
-
 try: 
     import gdal
 except ImportError:
     gdal = None
+
+from spicebox import raster, transforms
+
+from .__metadata__ import __version__
+from . import figures
+
+from .common import load_or_use_default, GridSizeMismatchError
 
 class MultigridConfigError (Exception):
     """Raised if a multgrid class is missing its configuration"""
