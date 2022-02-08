@@ -781,6 +781,59 @@ class MultiGrid (object):
             features += list(temp[mask])
         return np.array(features)
 
+    def clip_grids_translate(self, extent, temp_dir='.clip_temp/'):
+        """
+        """
+        from .tools import load_and_create
+        os.makedirs(temp_dir)
+
+        gdal_type = raster.numpy_type_lookup(self.grids.dtype)
+        
+        name = 'clipped'
+
+        self.save_all_as_geotiff(temp_dir, **{'base_filename':'full'})
+
+        files = sorted(glob.glob(os.path.join(temp_dir, 'full*.tif')))
+        # return 
+        for idx, in_file in enumerate(files):
+            
+            out_name = os.path.split(in_file)[1]
+            out_name = out_name.replace('full','clipped')
+            out_file = os.path.join(temp_dir, out_name)
+            print(idx, in_file, out_file)
+            raster.clip_raster(in_file, out_file, extent, datatpye=gdal_type)
+
+            os.remove(in_file)
+
+
+
+        files = sorted(glob.glob(os.path.join(temp_dir,'%s*.tif' % name)))
+        d, md = raster.load_raster(files[0])
+        
+        lp = {
+            "method": 'tiff',
+            "directory": temp_dir, # have to supply a directory
+            "file_name_structure": '%s_*.tif' % name,
+            "sort_func": sorted, 
+            "verbose": True}
+        cp = {
+            'name': self.config['dataset_name'] + '- sub area', 
+            # 'description': self.config['description'] + '- sub area: ' + name, 
+            'grid_names': list(self.config['grid_name_map'].keys()), 
+            'start_timestep': 
+                self.config['start_timestep'] if 'start_timestep' in self.config else None, 
+            'raster_metadata': md
+        }
+
+        rv = load_and_create(lp, cp)
+        rv.config['description'] = 'extent of area: ' + str(extent)
+        files = sorted(glob.glob(os.path.join(temp_dir,'*')))
+        for file in files:
+            os.remove(file)
+
+        os.rmdir(temp_dir)
+        return rv 
+
     def clip_grids(self, extent, location_format="ROWCOL", verbose=False):
         """Clip the desired extent from the multigrid. Returns a new 
         Multigrid with the smaller extent.
