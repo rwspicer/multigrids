@@ -848,8 +848,6 @@ class MultiGrid (object):
             (row_tr, col_tr, row_bl, col_bl) if location format == "ROWCOL"
             (east_tr, north_tr, east_bl, north_bl) if location format == "GEO"
             (Long_tr, Lat_tr, Long_bl, Lat_bl) if location == "WGS84"
-        radius: Int, default 50
-            number of pixels around center to include in zoom
         location_format: str, default "ROWCOL"
             "ROWCOl", "GEO", or "WGS84" to indcate if locations are in
             pixel, map, or WGS84 format
@@ -875,13 +873,16 @@ class MultiGrid (object):
             top_l = transforms.to_pixel(top_l, transform).astype(int)
             bottom_r = transforms.to_pixel(bottom_r, transform).astype(int)
 
+        
         if verbose:
             print ('top left', top_l)
             print ('bottom right', bottom_r)
 
         data = self.grids[0].reshape(self.config['grid_shape'])
         
-        view = raster.zoom_box(data, top_l, bottom_r)
+        view = raster.zoom_box(
+            data, copy.deepcopy(top_l), copy.deepcopy(bottom_r)
+        )
         n_grids = self.config['num_grids']
         rows, cols = view.shape
         
@@ -890,12 +891,11 @@ class MultiGrid (object):
             data_type=self.config['data_type'],
         )
         view.config['grid_name_map'] = self.config['grid_name_map']
-
         try:
             view.config['description'] = \
                 self.config['description'] + ' clipped to' + str(extent)
         except KeyError:
-             view.config['description'] = + 'Unknown clipped to' + str(extent)
+            view.config['description'] = 'Unknown clipped to' + str(extent)
         
         try:
             view.config['dataset_name'] = \
@@ -912,7 +912,9 @@ class MultiGrid (object):
 
         for idx in range(len(self.grids)):
             grid = self.grids[idx].reshape(self.config['grid_shape'])
-            zoom = raster.zoom_box(grid, top_l, bottom_r)
+            zoom = raster.zoom_box(
+                grid, copy.deepcopy(top_l), copy.deepcopy(bottom_r)
+            )
             view.grids[idx][:] = zoom.flatten()
 
         view.config['mask'] = raster.zoom_box(
@@ -924,7 +926,10 @@ class MultiGrid (object):
 
         for filter in self.config['filters']:
             filter_data = self.filters[filter]
-            filter_data = raster.zoom_box(filter_data, top_l, bottom_r)
+            filter_data = raster.zoom_box(
+                filter_data, 
+                copy.deepcopy(top_l), copy.deepcopy(bottom_r)
+            )
             view.add_filter(filter, filter_data )
 
 
