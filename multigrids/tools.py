@@ -6,6 +6,7 @@ Tools for creation/editing of multigrid classes
 
 """
 import os
+import shutil
 from tempfile import mkdtemp
 import glob
 
@@ -189,6 +190,7 @@ def tiffs_to_array (
         if verbose:
             print('Reading file:', os.path.split(fi)[1])
         grid, md = raster.load_raster(fi)
+        dtype = grid.dtype
         if shape is None:
             rows, cols = grid.shape
             shape = len(files), rows, cols
@@ -198,9 +200,10 @@ def tiffs_to_array (
             ## TODO: add init data?
             ## TODO: add option to create as an array
             array = np.memmap(os.path.join(directory, 'temp.mgdata'),
-                shape=shape, dtype=np.float32, mode='w+') 
+                shape=shape, dtype=dtype, mode='w+') 
                 
         array[ix][:] = grid
+        del (grid)
         
     return array 
 
@@ -239,3 +242,55 @@ def load_and_create( load_params = {}, create_params = {}):
 
     return grid
     
+def combine(inputs, result_name, 
+        final_extent = None, temp_dir = './TEMP-COMBINE', warp_options=[],
+        datatype=raster.gdal.GDT_Float32):
+    """combine geo-referenced multigrids into a single grid
+    """
+    os.makedirs(temp_dir)
+
+    index = 0
+    # temp_base_names = []
+    # print(inputs.config)
+    for grid in inputs:
+        bn = 'mg-%i' % index
+        # temp_base_names.append(bn)
+        print(grid.config)
+        grid.save_all_as_geotiff(temp_dir, **{'base_filename': bn})
+
+    merged_path = os.path.join(temp_dir, 'merged')
+    os.makedirs(merged_path)
+    grid_names = sorted(list(inputs[0].config['grid_name_map'].keys()))
+    # print(grid_names)
+    
+    for gn in grid_names:
+        outfile = os.path.join(merged_path, 'merged-%s.tif', gn)
+        matching_files = glob.glob(os.path.join(temp_dir, '*%s.tif' %  gn))
+        raster.merge(matching_files, outfile, warp_options)
+        if final_extent:
+            raster.clip_raster(outfile, outfile, final_extent,  datatype)
+    
+
+    lp = {
+        "method": 'tiff',
+        "directory": merged_path,
+        "file_name_structure": 'merged-*.tif',
+        "sort_func": sorted, 
+        "verbose": False
+    }
+    
+    cp = {
+        'name': result_name,  
+        'grid_names': grid_names, 
+        'start_timestep': 
+            inputs[0].config['start_timestep'] if \
+                'start_timestep' in inputs[0].config else None, 
+        'raster_metadata': raster.load_raster(outfile)[1] # last outfile from previous loop should work
+    }
+
+    rv = load_and_create(lp, cp)
+        
+    shutil.rmtree(temp_dir)
+
+    return rv 
+        

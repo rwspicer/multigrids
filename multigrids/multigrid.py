@@ -58,9 +58,9 @@ def open_or_create_memmap_grid(filename, mode, dtype, shape):
     
     """
     if not os.path.exists(filename) and mode in ('r','r+'):
-        ## if file dne initialize and delete
+        ## if file does not exist; initialize and delete
         grids = np.memmap(filename, dtype=dtype, mode='w+', shape=shape)           
-        del grids
+        del(grids)
     return np.memmap(filename, dtype=dtype, mode=mode, shape=shape)
     
 
@@ -183,43 +183,6 @@ class MultiGrid (object):
 
         if hasattr(self,' _tempfile_loc'):
             os.remove(self._tempfile_loc)
-
-            
-
-    # def __getattr__(self, attr):
-    #     """get attribute, allows access to config dictionary values
-    #     as class attributes 
-
-    #     Paramaters
-    #     ----------
-    #     attr: str
-    #         attribute. spaces in this paramater are replaced with '_' if 
-    #         the space version of the attribute is not found.
-
-    #     Raises
-    #     ------
-    #     AttributeError:
-    #         if Attribute is not found.
-
-    #     Returns
-    #     -------
-    #     value of attribute
-    #     """
-    #     # if not hasattr(self, 'config'):
-    #     #     raise MultigridConfigError( "config dictionary not found" )
-    #     # try:
-    #     if attr == 'config':
-    #         return self.config
-    #     elif attr in self.config and attr != 'config'  and attr != 'config':
-    #         return self.config[attr]
-    #     elif attr.replace('_',' ') in self.config and attr != 'config':
-    #         return self.config[attr.replace('_',' ')]
-    #     else:
-    #         s = "'" + self.__class__.__name__ + \
-    #             "' object has no attribute '" + attr + "'"
-    #         raise AttributeError(s)
-    #     # except(AttributeError) as e:
-    #     #     return 'not attr'
         
     def __repr__ (self):
         """Get string representation of object
@@ -414,7 +377,7 @@ class MultiGrid (object):
             file = self.config['dataset_name'].lower().replace(' ','_') + '.yml'
 
         s_config = copy.deepcopy(self.config)
-        if s_config['data_model'] is 'array' or s_config['filename'] is None:
+        if s_config['data_model'] == 'array' or s_config['filename'] is None:
             try:
                 path, grid_file = os.path.split(file)
             except ValueError:
@@ -544,25 +507,18 @@ class MultiGrid (object):
         grids: np.array or np.memmap
         """
         filename = config['filename']
-        if config['filename'] is None and config['data_model'] == 'memmap':
-            # print "a"
-            filename = os.path.join(mkdtemp(), 'temp.dat')
-            self._tempfile_loc = filename
-        elif not config['filename'] is None and not os.path.exists(filename):
-            # print "b", filename
-            filename = os.path.split(filename)[1]
-            filename = os.path.join(config['cfg_path'], filename)
-            
         if config['data_model'] == 'memmap':
-           
-            
-            # print filename
+            if filename is None:
+                filename = os.path.join(mkdtemp(), 'temp.dat')
+
             grids = open_or_create_memmap_grid(
                 filename, 
                 config['mode'], 
                 config['data_type'], 
                 config['memory_shape']
             )
+            self.config['filename '] = filename
+
         else: # array
             grids = np.zeros(config['memory_shape'])
         return grids 
@@ -970,12 +926,8 @@ class MultiGrid (object):
         multigrid.Multigrid
         """
         from .tools import load_and_create
-        # load_and_create
-        # return
-        # try: # add exception?
         os.makedirs(temp_dir)
-       
-
+    
         self.save_all_as_geotiff(temp_dir, **{'base_filename':'full'})
 
         files = sorted(glob.glob(os.path.join(temp_dir, 'full*.tif')))
@@ -996,6 +948,7 @@ class MultiGrid (object):
             "file_name_structure": '%s_*.tif' % name,
             "sort_func": sorted, 
             "verbose": False}
+    
         cp = {
             'name': self.config['dataset_name'] + '- sub area: ' + name, 
             # 'description': self.config['description'] + '- sub area: ' + name, 
