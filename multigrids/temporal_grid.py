@@ -1,3 +1,4 @@
+from tkinter import N
 from .multigrid import MultiGrid
 import numpy as np
 import yaml
@@ -107,6 +108,55 @@ class TemporalGrid (MultiGrid):
             key -= self.config['start_timestep']
             
         return super().__getitem__(key)
+
+    
+    def set_grid(self, grid_id, new_grid):
+        """Set a grid
+         Parameters ffff
+        ----------
+        grid_id: int or str
+            if an int, it should be the grid number.
+            if a str, it should be a grid name.
+        new_grid: np.array like, or any
+            Grid to set. must be able to reshape to grid_shape.
+        """
+
+        if type(grid_id) is int:
+            start = self.config['start_timestep']
+            end =  start + self.config['num_timesteps']
+            # print(grid_id) 
+            if start <= grid_id < end:
+                grid_id = grid_id - start
+            else:
+                raise IndexError('start_timestep <= timestep < end_timestep')
+            # print(grid_id)
+        super().set_grid(grid_id, new_grid)
+        
+    
+    def set_sub_grid(self, grid_id, index, new_grid):
+        """sets the values of part of a given grid
+
+        Parameters
+        ----------
+        grid_id: int or str
+            if an int, it should be a timestep
+            if a str, it should be a grid name.
+        index: slice of tuple of slices, or other index
+            index into grid
+        new_gird: 
+            values that can be broadcast in to shape of index
+
+        """
+        if type(grid_id) is int:
+            start = self.config['start_timestep']
+            end =  start + self.config['num_timesteps']
+            if start <= grid_id < end:
+                grid_id = grid_id - start
+            else:
+                raise IndexError('start_timestep <= timestep < end_timestep')
+            # print(grid_id)
+        super().set_sub_grid(grid_id, index, new_grid)
+
   
 
 

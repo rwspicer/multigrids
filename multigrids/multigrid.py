@@ -220,6 +220,7 @@ class MultiGrid (object):
         
         return self.grids.reshape(self.config['real_shape'])[key].reshape(self.config['grid_shape']) * _filter
 
+
     def __setitem__(self, key, value):
         """Set item function
         
@@ -231,10 +232,11 @@ class MultiGrid (object):
         value: np.array like
             Grid that is set. Should have shape of self.config['grid_shape'].
         """
-        if type(key) in (str,):
-            key = self.get_grid_number(key)
-        # if type(key) in (tuple, int, slice):
-        self.grids[key] = value.flatten()
+        if type(key) is tuple:
+            self.set_sub_grid(key[0], key[1:], value)
+        else:
+            self.set_grid(key, value)
+
     
     def __eq__(self, other):
         """Equality Operator for MultiGrid object 
@@ -442,9 +444,10 @@ class MultiGrid (object):
             sfile.write('#Saved ' + self.__class__.__name__ + " metadata\n")
             yaml.dump(s_config, sfile, default_flow_style=False)
 
-        shape = self.grids.shape
-        del(self.grids) 
-        self.grids = np.memmap(
+        if self.grids.filename != s_config['filename']:
+            shape = self.grids.shape
+            del(self.grids) 
+            self.grids = np.memmap(
                 s_config['filename'], 
                 mode = self.config['mode'], 
                 dtype = self.config['data_type'], 
@@ -617,11 +620,34 @@ class MultiGrid (object):
         grid_id: int or str
             if an int, it should be the grid number.
             if a str, it should be a grid name.
-        new_grid: np.array like
+        new_grid: np.array like, or number
             Grid to set. must be able to reshape to grid_shape.
         """
-        self[grid_id] = new_grid.reshape(self.config['grid_shape'])
+        if type(grid_id) in (str,):
+            grid_id = self.get_grid_number(grid_id)
+        try:
+            self.grids[grid_id] = new_grid.flatten()
+        except AttributeError:
+            self.grids[grid_id][:] = new_grid
+    
+    def set_sub_grid(self, grid_id, index, new_grid):
+        """sets the values of part of a given grid
 
+        Parameters
+        ----------
+        grid_id: int or str
+            if an int,  it should be the grid number.
+            if a str, it should be a grid name.
+        index: slice of tuple of slices, or other index
+            index into grid
+        new_gird: 
+            values that can be broadcast in to shape of index
+        """
+        if type(grid_id) in (str,):
+            grid_id = self.get_grid_number(grid_id)
+
+        self.grids[grid_id].reshape(self.config['grid_shape'])[index] = new_grid
+        
     def save_figure(
             self, grid_id, filename, figure_func=figures.default, figure_args={}, data=None
         ):
