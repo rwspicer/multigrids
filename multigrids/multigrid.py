@@ -12,6 +12,7 @@ import os
 import glob
 import copy
 from tempfile import mkdtemp
+from tkinter.messagebox import NO
 
 import yaml
 import numpy as np
@@ -321,6 +322,8 @@ class MultiGrid (object):
         grids = self.setup_internal_memory(config)
         
         init_data = load_or_use_default(kwargs, 'initial_data', None)
+        
+
         if not init_data is None:
             grids = init_data.reshape(config['memory_shape'])
 
@@ -397,6 +400,7 @@ class MultiGrid (object):
             del save_file ## close file
             s_config['filename'] = os.path.split(data_file)[1]
         
+        
         del s_config['memory_shape']
         del s_config['real_shape']
 
@@ -437,6 +441,15 @@ class MultiGrid (object):
         with open(file, 'w') as sfile:
             sfile.write('#Saved ' + self.__class__.__name__ + " metadata\n")
             yaml.dump(s_config, sfile, default_flow_style=False)
+
+        shape = self.grids.shape
+        del(self.grids) 
+        self.grids = np.memmap(
+                s_config['filename'], 
+                mode = self.config['mode'], 
+                dtype = self.config['data_type'], 
+                shape = shape
+            )
         
     def create_name_map(self, grid_names):
         """Creates a dictionary to map string grid names to their 
@@ -517,7 +530,7 @@ class MultiGrid (object):
                 config['data_type'], 
                 config['memory_shape']
             )
-            self.config['filename '] = filename
+            # config['filename '] = filename
 
         else: # array
             grids = np.zeros(config['memory_shape'])
