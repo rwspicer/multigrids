@@ -108,18 +108,20 @@ class MultiGrid (object):
         'data_model': model of data in memory, 'array', or 'memmap'
         'grid_name_map': map of grid names to gird ids
     grids: np.memmap or np.ndarray 
+    _is_temp: bool
+        attribute to indicate if internal memmap is a tempfile
+    filters: dict
+        dictionary of flites that may be applied to data when accessing
+    
     """
 
     def __init__ (self, *args, **kwargs):
         """ Class initializer """
-        # print( args )
-        # print( kwargs )
+        self._is_temp = False
         if type(args[0]) is int:
-            # print('new')
             init_func = self.new
 
         if type(args[0]) is str:
-            # print('load')
             init_func = self.load
 
         self.filters = {} 
@@ -127,8 +129,6 @@ class MultiGrid (object):
 
         self.config, self.grids = init_func(*args, **kwargs)
         self.config['multigrids_version'] =  __version__
-
-
 
         if "filters" in self.config and type(args[0]) is str:
             if (not self.config['filters'] is None) and \
@@ -154,7 +154,7 @@ class MultiGrid (object):
                     self.filters[f] = f_data[c].reshape(rows,cols)
 
 
-        try:
+        if 'raster_metadata' in self.config:
             if type(self.config['raster_metadata']) is dict:
                 pass # right-o move along
             else: # old raster metadata fromat
@@ -170,20 +170,26 @@ class MultiGrid (object):
                     'x_size': nX,
                     'y_size': nY,
                 }
-        except KeyError:
-            pass # no raster meta is a ok
+        # except KeyError:
+        #     pass # no raster meta is a ok
 
 
     def __del__ (self):
         """deconstructor for class"""
         if hasattr(self, 'config'):
-
             del(self.config)
+        
+        try:
+            loc = self.grids.filename
+        except AttributeError:
+            pass
+
         if hasattr(self, 'grids'):
             del(self.grids)
 
-        if hasattr(self,' _tempfile_loc'):
-            os.remove(self._tempfile_loc)
+        if self._is_temp:
+            os.remove(loc)
+
         
     def __repr__ (self):
         """Get string representation of object
@@ -220,7 +226,6 @@ class MultiGrid (object):
         
         return self.grids.reshape(self.config['real_shape'])[key].reshape(self.config['grid_shape']) * _filter
 
-
     def __setitem__(self, key, value):
         """Set item function
         
@@ -237,7 +242,6 @@ class MultiGrid (object):
         else:
             self.set_grid(key, value)
 
-    
     def __eq__(self, other):
         """Equality Operator for MultiGrid object 
 
@@ -286,7 +290,6 @@ class MultiGrid (object):
         Grids: np.array like
             array to be used as internal memory.
         """
-
         config = {}
         config['grid_shape']= (args[0], args[1])
         config['num_grids'] = args[2]
@@ -444,16 +447,21 @@ class MultiGrid (object):
             sfile.write('#Saved ' + self.__class__.__name__ + " metadata\n")
             yaml.dump(s_config, sfile, default_flow_style=False)
 
+        ## if were saving a memmap make sure the new mg object is pointing
+        ## to the right file
         if self.grids.filename != s_config['filename']:
             shape = self.grids.shape
+            to_remove_filename = self.grids.filename
             del(self.grids) 
+            os.remove(to_remove_filename)
             self.grids = np.memmap(
                 s_config['filename'], 
                 mode = self.config['mode'], 
                 dtype = self.config['data_type'], 
                 shape = shape
             )
-        
+        self._is_temp = False
+
     def create_name_map(self, grid_names):
         """Creates a dictionary to map string grid names to their 
         interger index values. Used to initialize gird_name_map
@@ -526,6 +534,7 @@ class MultiGrid (object):
         if config['data_model'] == 'memmap':
             if filename is None:
                 filename = os.path.join(mkdtemp(), 'temp.dat')
+                self._is_temp = True
 
             grids = open_or_create_memmap_grid(
                 filename, 
@@ -655,7 +664,6 @@ class MultiGrid (object):
         """
         if data is None:
             data = self[grid_id].astype(float)
-        # data[np.logical_not(self.mask)] = np.nan
         
         if not 'title' in figure_args:
             figure_args['title'] = self.config["dataset_name"] 
