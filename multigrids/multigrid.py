@@ -357,9 +357,13 @@ class MultiGrid (object):
         config['memory_shape'] = self.get_memory_shape(config)
         config['real_shape'] = self.get_real_shape(config)
         grids = self.setup_internal_memory(config)
+
+        if type(config['mask']) is str and os.path.isfile(config['mask']):
+            config['mask'] = np.load(config['mask'])
+
         return config, grids
 
-    def save(self, file=None, grid_file_ext = '.mgdata'):
+    def save(self, file=None, grid_file_ext = '.grids.data'):
         """Save MiltiGrid Object to metadata file and data file
         The metadata file cantinas the config info, and the data file
         contains the grids. 
@@ -442,6 +446,22 @@ class MultiGrid (object):
             del f_data ## close file
             
             s_config['filters'] = f_map
+
+        if 'mask' in s_config:
+            try:
+                path, mask_file = os.path.split(file)
+            except ValueError:
+                path, mask_file = './', file
+            
+            if mask_file[0] == '.':
+                mask_file = '.' + mask_file[1:].split('.')[0] + '.mask.data'
+            else:
+                mask_file = mask_file.split('.')[0] + '.mask.data'
+            mask_file = os.path.join(path,mask_file)
+
+            np.save(mask_file, self.config['mask'])
+            os.rename(mask_file + '.npy', mask_file)
+            s_config['mask'] = mask_file
 
         with open(file, 'w') as sfile:
             sfile.write('#Saved ' + self.__class__.__name__ + " metadata\n")
