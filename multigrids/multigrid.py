@@ -60,6 +60,7 @@ def open_or_create_memmap_grid(filename, mode, dtype, shape):
     """
     if not os.path.exists(filename) and mode in ('r','r+'):
         ## if file does not exist; initialize and delete
+        print(filename, dtype, shape)
         grids = np.memmap(filename, dtype=dtype, mode='w+', shape=shape)           
         del(grids)
     return np.memmap(filename, dtype=dtype, mode=mode, shape=shape)
@@ -117,7 +118,9 @@ class MultiGrid (object):
 
     def __init__ (self, *args, **kwargs):
         """ Class initializer """
+        # print('init')
         self._is_temp = False
+
         if type(args[0]) is int:
             init_func = self.new
 
@@ -182,12 +185,12 @@ class MultiGrid (object):
         try:
             loc = self.grids.filename
         except AttributeError:
-            pass
+            loc = None
 
         if hasattr(self, 'grids'):
             del(self.grids)
 
-        if self._is_temp:
+        if self._is_temp and not loc is None and os.path.exists(loc):
             os.remove(loc)
 
         
@@ -469,13 +472,15 @@ class MultiGrid (object):
 
         ## if were saving a memmap make sure the new mg object is pointing
         ## to the right file
-        if self.grids.filename != s_config['filename']:
+        if hasattr(self.grids, 'filename') and \
+                self.grids.filename != s_config['filename']:
+            path = os.path.split(file)[0]
             shape = self.grids.shape
             to_remove_filename = self.grids.filename
             del(self.grids) 
             os.remove(to_remove_filename)
             self.grids = np.memmap(
-                s_config['filename'], 
+                os.path.join(path,s_config['filename']), 
                 mode = self.config['mode'], 
                 dtype = self.config['data_type'], 
                 shape = shape
@@ -555,7 +560,7 @@ class MultiGrid (object):
             if filename is None:
                 filename = os.path.join(mkdtemp(), 'temp.dat')
                 self._is_temp = True
-
+            # print('a', type(self), config['memory_shape'])
             grids = open_or_create_memmap_grid(
                 filename, 
                 config['mode'], 
@@ -585,10 +590,6 @@ class MultiGrid (object):
         return (config['num_grids'], 
             config['grid_shape'][0] * config['grid_shape'][1])
         
-    # def set_cell_value (self,val, key, row, col):
-    #     gn = self.get_grid_number(key)
-    #     self.grids[gn].reshape[self.config['real_shape']][row,col]=val
-
     def get_real_shape (self, config):
         """Construct the shape that represents the real shape of the 
         data for the MultiGird.

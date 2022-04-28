@@ -207,6 +207,47 @@ def tiffs_to_array (
         
     return array 
 
+def binary_to_array(
+        directory = None, file_name_structure='*.bin', sort_func = sorted, 
+        verbose = False, **kwargs
+    ):
+    """
+    """
+    if directory is None:
+        raise IOError("directory dose not exist")
+    if verbose:
+        print(
+            "Directory and wild card being used:", 
+            directory, file_name_structure
+        )
+    
+    path = os.path.join(directory, file_name_structure)
+    print('bta path',path)
+    files = glob.glob(path)
+    files = sort_func(files)
+
+
+    if verbose:
+        print ("Displaying First  15 sorted files:")
+        for f in files[:15]:
+            print('\t', f)
+        print ("Displaying last  15 sorted files:")
+        for f in files[-15:]:
+            print('\t', f)
+
+    shape = (len(files), kwargs['rows'], kwargs['cols'])
+    dtype = np.fromfile(files[0]).dtype 
+    array = np.memmap(os.path.join(directory, 'temp.mgdata'),
+                shape=shape, dtype=dtype, mode='w+') 
+
+    for ix, fi in enumerate(files):
+        grid =  np.fromfile(fi).reshape((kwargs['rows'], kwargs['cols']))
+        array[ix][:] = grid
+        del(grid)
+    
+    return array
+
+
 
 def load_and_create( load_params = {}, create_params = {}):
     """loads data and creates a multigrid
@@ -233,7 +274,17 @@ def load_and_create( load_params = {}, create_params = {}):
         tiff_params.update(load_params)
         load_params = tiff_params
         load_function = tiffs_to_array
-        
+    elif load_params['method'] == 'binary':
+        ## need to have rows and cols load params
+        bin_params = {
+            "directory": None, # have to supply a directory
+            "file_name_structure": '*.bin',
+            "sort_func": sorted, 
+            "verbose": False
+        }
+        bin_params.update(load_params)
+        load_params = bin_params
+        load_function = binary_to_array
     else:
         return False 
     
