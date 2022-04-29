@@ -222,12 +222,36 @@ class MultiGrid (object):
             Grid from the multigrid with the shape self.config['grid_shape']
         
         """
-        if type(key) in (str,):
-            key = self.get_grid_number(key)
-
-        _filter = self.filters[self.current_filter] if self.current_filter else 1
+        # print(key)
+        if type(key) is tuple and type(key[0]) in (list, range, slice):
+            ## multiple subgrids
+            # print(key[0])
+            nk = key[0]
+            if type(nk) is slice:
+                nk = range(nk.start,nk.stop,(nk.step if nk.step else 1))
+            
+            grids = self.get_subgrids(nk, key[1:], False)
+            index = key[1:]
         
-        return self.grids.reshape(self.config['real_shape'])[key].reshape(self.config['grid_shape']) * _filter
+        elif type(key) in [range, slice] or \
+             type(key) is tuple and not type(key[1]) in (np.ndarray, list, range, slice):
+            ## multiple Grids
+            # print (type(key[1]))
+            if type(key) is slice:
+                key = range(key.start,key.stop,(key.step if key.step else 1))
+            grids = self.get_grids(key, False)
+            index = slice(None, None)
+        elif type(key) is tuple and len(key) > 1: ## single subgrid
+            grids = self.get_subgrid(key[0], key[1:], False)
+            index = key[1:]
+        else:
+            grids = self.get_grid(key, False)
+            index = slice(None, None)
+
+        _filter = self.current_filter
+        _filter = self.filters[_filter][index] if _filter else 1
+
+        return grids * _filter
 
     def __setitem__(self, key, value):
         """Set item function
@@ -241,7 +265,7 @@ class MultiGrid (object):
             Grid that is set. Should have shape of self.config['grid_shape'].
         """
         if type(key) is tuple:
-            self.set_sub_grid(key[0], key[1:], value)
+            self.set_subgrid(key[0], key[1:], value)
         else:
             self.set_grid(key, value)
 
@@ -621,7 +645,8 @@ class MultiGrid (object):
         int
             gird id
         """
-        return grid_id if type(grid_id) is int else self.config['grid_name_map'][grid_id]
+        return grid_id if type(grid_id) is int \
+                       else self.config['grid_name_map'][grid_id]
     
     def get_grid(self, grid_id, flat = True):
         """Get a grid
@@ -639,9 +664,54 @@ class MultiGrid (object):
         np.array
             1d if flat, 2d otherwise.
         """
+        grid_id = self.get_grid_number(grid_id)
+        grid = self.grids[grid_id]
         if flat:
-            return self[grid_id].flatten()
-        return self[grid_id]
+            return grid
+        return grid.reshape(self.config['grid_shape'])
+
+    def get_subgrid(self, grid_id, index, flat = True):
+        """Get a sub grid
+        """
+        grid_id = self.get_grid_number(grid_id)
+        
+
+        subgrid = self.grids[grid_id].reshape(self.config['grid_shape'])[index]
+        
+        if flat:
+            return subgrid.flatten()
+        return subgrid
+
+    def get_grids(self, grid_ids, flat = True):
+        """
+        """
+        grid_ids = [self.get_grid_number(gid) for gid in grid_ids]
+        grids = self.grids[grid_ids]
+        if flat:
+            return grids
+        rows, cols = self.config['grid_shape']
+        return grids.reshape([len(grids), rows, cols])
+
+    def get_subgrids(self, grid_ids, index, flat=True):
+        """
+        """
+        # print(index)
+        grids = self.get_grids(grid_ids, False)
+        if type(index) is tuple and len(index) == 2:
+            index = slice(None,None), index[0], index[1]
+        elif type(index) is tuple and len(index) == 1:
+            index = slice(None,None), index[0]
+            # print(index)
+        else:
+            index = slice(None,None), index
+        
+        subgrids = grids[index]
+        shape = subgrids.shape
+        if flat and len(shape) == 3:
+            return subgrids.reshape(shape[0], shape[1] * shape[2])
+        return subgrids
+        
+
 
     def set_grid(self, grid_id, new_grid):
         """Set a grid
@@ -653,14 +723,14 @@ class MultiGrid (object):
         new_grid: np.array like, or number
             Grid to set. must be able to reshape to grid_shape.
         """
-        if type(grid_id) in (str,):
-            grid_id = self.get_grid_number(grid_id)
+        grid_id = self.get_grid_number(grid_id)
+
         try:
             self.grids[grid_id] = new_grid.flatten()
         except AttributeError:
             self.grids[grid_id][:] = new_grid
     
-    def set_sub_grid(self, grid_id, index, new_grid):
+    def set_subgrid(self, grid_id, index, new_grid):
         """sets the values of part of a given grid
 
         Parameters
@@ -673,8 +743,7 @@ class MultiGrid (object):
         new_gird: 
             values that can be broadcast in to shape of index
         """
-        if type(grid_id) in (str,):
-            grid_id = self.get_grid_number(grid_id)
+        grid_id = self.get_grid_number(grid_id)
 
         self.grids[grid_id].reshape(self.config['grid_shape'])[index] = new_grid
         
