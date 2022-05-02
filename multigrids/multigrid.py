@@ -549,7 +549,6 @@ class MultiGrid (object):
         else:
             raise MultigridFilterError("invalid filter: %s" % name)
 
-
     def setup_internal_memory(self, config):
         """Setup the internal memory representation of grids
 
@@ -650,18 +649,17 @@ class MultiGrid (object):
         step: int
             step for slice
 
-
-        returns
+        Returns
         -------
         slice
         """
         start = self.get_grid_number(start) if start else None
         end = self.get_grid_number(end) if end else None
-        step = self.get_grid_number(step) if step else None
+        step = step if step else 1
 
         return slice(start, end, step)
 
-    def get_grid_range(self, start = None, end = None, step = None):
+    def get_grid_range(self, start = None, end = None, step = 1):
         """Get grid id range from multigrid keys
 
         parameters
@@ -673,18 +671,16 @@ class MultiGrid (object):
         step: int
             step for slice
 
-
         returns
         -------
         slice
         """
         start = self.get_grid_number(start) if start else 0
-        end = self.get_grid_number(end) if end else None
-        step = self.get_grid_number(step) if step else 1
-
+        end = self.get_grid_number(end) if end else len(self.grids)
+        step = step if step else 1
+  
         return range(start, end, step)        
 
-        
     def get_grid(self, grid_id, flat = True):
         """Get a grid
         
@@ -753,7 +749,12 @@ class MultiGrid (object):
             2d if flat, 3d otherwise.
             Filter is applied if `set_filter` has been called
         """
-        grid_ids = [self.get_grid_number(gid) for gid in grid_ids]
+        if not type(grid_ids) in [slice, range]:
+            grid_ids = [self.get_grid_number(gid) for gid in grid_ids]
+        else:
+            grid_ids = self.get_grid_range(
+                grid_ids.start, grid_ids.stop, grid_ids.step
+            )
 
         _filter = self.current_filter
         _filter = self.filters[_filter].flatten() if _filter else 1
