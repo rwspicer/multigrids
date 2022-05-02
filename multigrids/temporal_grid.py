@@ -126,32 +126,12 @@ class TemporalGrid (MultiGrid):
         if type(grid_id) is int:
             start = self.config['start_timestep']
             end =  start + self.config['num_timesteps']
-            if start <= grid_id < end:
+            if start <= grid_id <= end:
                 return grid_id - start
             else:
-                raise IndexError('start_timestep <= timestep < end_timestep')
+                raise IndexError('start_timestep <= timestep <= end_timestep')
         
         return super().get_grid_number(grid_id)
-
-    # def get_grids_at_keys(self,keys):
-    #     """return the grids for the given keys
-
-    #     Parameters
-    #     ----------
-    #     keys: list
-    #         list of grids
-        
-    #     Returns
-    #     -------
-    #     np.array
-    #     """
-    #     select = np.zeros([len(keys), self.config['grid_shape'][0],self.config['grid_shape'][1] ] )
-    #     c = 0
-    #     for k in keys:
-    #         select[c] = self[k]
-    #         c += 1
-    #     return select
-        
 
     def get_memory_shape (self,config):
         """ Construct the shape needed for multigrid in memory from 
