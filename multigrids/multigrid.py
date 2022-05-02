@@ -7,12 +7,10 @@ multigrid.py
 This file contains the MultiGrid class
 
 """
-
 import os
 import glob
 import copy
 from tempfile import mkdtemp
-from tkinter.messagebox import NO
 
 import yaml
 import numpy as np
@@ -30,7 +28,7 @@ from . import figures
 from .common import load_or_use_default, GridSizeMismatchError
 
 class MultigridConfigError (Exception):
-    """Raised if a multgrid class is missing its configuration"""
+    """Raised if a multigrid class is missing its configuration"""
 
 class MultigridIOError (Exception):
     """Raised during multigrid IO"""
@@ -231,27 +229,19 @@ class MultiGrid (object):
                 nk = range(nk.start,nk.stop,(nk.step if nk.step else 1))
             
             grids = self.get_subgrids(nk, key[1:], False)
-            index = key[1:]
-        
         elif type(key) in [range, slice] or \
              type(key) is tuple and not type(key[1]) in (np.ndarray, list, range, slice):
             ## multiple Grids
             # print (type(key[1]))
             if type(key) is slice:
                 key = range(key.start,key.stop,(key.step if key.step else 1))
-            grids = self.get_grids(key, False)
-            index = slice(None, None)
+            grids = self.get_grids(key, False) 
         elif type(key) is tuple and len(key) > 1: ## single subgrid
-            grids = self.get_subgrid(key[0], key[1:], False)
-            index = key[1:]
+            grids = self.get_subgrid(key[0], key[1:], False)   
         else:
             grids = self.get_grid(key, False)
-            index = slice(None, None)
 
-        _filter = self.current_filter
-        _filter = self.filters[_filter][index] if _filter else 1
-
-        return grids * _filter
+        return grids 
 
     def __setitem__(self, key, value):
         """Set item function
@@ -663,37 +653,88 @@ class MultiGrid (object):
         -------
         np.array
             1d if flat, 2d otherwise.
+            Filter is applied if `set_filter` has been called
         """
         grid_id = self.get_grid_number(grid_id)
-        grid = self.grids[grid_id]
+
+        _filter = self.current_filter
+        _filter = self.filters[_filter].flatten() if _filter else 1
+
+        grid = self.grids[grid_id] * _filter
         if flat:
             return grid
         return grid.reshape(self.config['grid_shape'])
 
     def get_subgrid(self, grid_id, index, flat = True):
-        """Get a sub grid
-        """
-        grid_id = self.get_grid_number(grid_id)
+        """Get a part of a grid 
         
+        Paramaters
+        ----------
+        grid_id: str or key
+            if an int, it should be the grid number.
+            if a str, it should be a grid name.
+        index: slice of tuple of slices, or other index
+            index that is within grid_shape
+        flat: bool, Default True
+            if True return flat array
 
-        subgrid = self.grids[grid_id].reshape(self.config['grid_shape'])[index]
-        
+        Paramaters
+        ----------
+        np.array like
+            1d if flat, 2d otherwise.
+            Filter is applied if `set_filter` has been called
+        """
+        subgrid = self.get_grid(grid_id, False)[index]
         if flat:
             return subgrid.flatten()
         return subgrid
 
     def get_grids(self, grid_ids, flat = True):
-        """
+        """Get a set of grids
+        
+        Parameters
+        ----------
+        grid_ids: list, or range
+            Items should be int or str Multigird key values
+        flat: bool, defaults true
+            If true, each grid is flattend and the returned value
+            is 2D, otherwise returned value is 3D
+
+        Returns
+        -------
+        np.array
+            2d if flat, 3d otherwise.
+            Filter is applied if `set_filter` has been called
         """
         grid_ids = [self.get_grid_number(gid) for gid in grid_ids]
-        grids = self.grids[grid_ids]
+
+        _filter = self.current_filter
+        _filter = self.filters[_filter].flatten() if _filter else 1
+
+        grids = self.grids[grid_ids] * _filter
         if flat:
             return grids
         rows, cols = self.config['grid_shape']
         return grids.reshape([len(grids), rows, cols])
 
     def get_subgrids(self, grid_ids, index, flat=True):
-        """
+        """Get parts of a set of grids
+        
+        Parameters
+        ----------
+        grid_ids: list, or range
+            Items should be int or str Multigird key values
+        index: slice of tuple of slices, or other index
+            index that is within grid_shape
+        flat: bool, defaults true
+            If true, each grid is flattend and the returned value
+            is 2D, otherwise returned value is 3D
+
+        Returns
+        -------
+        np.array
+            2d if flat, 3d otherwise.
+            Filter is applied if `set_filter` has been called
         """
         # print(index)
         grids = self.get_grids(grid_ids, False)
@@ -711,8 +752,6 @@ class MultiGrid (object):
             return subgrids.reshape(shape[0], shape[1] * shape[2])
         return subgrids
         
-
-
     def set_grid(self, grid_id, new_grid):
         """Set a grid
          Parameters
