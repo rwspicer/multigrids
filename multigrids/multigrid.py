@@ -25,7 +25,8 @@ from spicebox import raster, transforms
 from .__metadata__ import __version__
 from . import figures
 
-from .common import load_or_use_default, GridSizeMismatchError
+# from .common import common.load_or_use_default, GridSizeMismatchError
+import common
 
 class MultigridConfigError (Exception):
     """Raised if a multigrid class is missing its configuration"""
@@ -36,32 +37,6 @@ class MultigridIOError (Exception):
 class MultigridFilterError (Exception):
     """Raised during multigrid Filter ops"""
 
-
-def open_or_create_memmap_grid(filename, mode, dtype, shape):
-    """Initialize or open a memory mapped np.array.
-    
-    Parameters
-    ----------
-    filename: str
-        Path to file to create or open
-    mode: str
-        Mode to open file in: 'r', 'r+' or 'w+'.
-    dtype: str
-        Data type of array. Must be a type suppored by numpy.
-    shape: tuple
-        Shape of array to create 
-
-    Returns
-    -------
-    Opened memory mapped array.
-    
-    """
-    if not os.path.exists(filename) and mode in ('r','r+'):
-        ## if file does not exist; initialize and delete
-        print(filename, dtype, shape)
-        grids = np.memmap(filename, dtype=dtype, mode='w+', shape=shape)           
-        del(grids)
-    return np.memmap(filename, dtype=dtype, mode=mode, shape=shape)
     
 class MultiGrid (object):
     """
@@ -219,24 +194,24 @@ class MultiGrid (object):
             Grid from the multigrid with the shape self.config['grid_shape']
         
         """
-        # print(key)
         if type(key) is tuple and type(key[0]) in (list, range, slice):
             ## multiple subgrids
-            # print(key[0])
             nk = key[0]
             if type(nk) is slice:
                 nk = range(nk.start,nk.stop,(nk.step if nk.step else 1))
-            
             grids = self.get_subgrids(nk, key[1:], False)
+
         elif type(key) in [range, slice] or \
-             type(key) is tuple and not type(key[1]) in (np.ndarray, list, range, slice):
+                type(key) is tuple and \
+                not type(key[1]) in (np.ndarray, list, range, slice):
             ## multiple Grids
-            # print (type(key[1]))
             if type(key) is slice:
                 key = range(key.start,key.stop,(key.step if key.step else 1))
             grids = self.get_grids(key, False) 
+
         elif type(key) is tuple and len(key) > 1: ## single subgrid
             grids = self.get_subgrid(key[0], key[1:], False)   
+
         else:
             grids = self.get_grid(key, False)
 
@@ -253,26 +228,23 @@ class MultiGrid (object):
         value: np.array like
             Grid that is set. Should have shape of self.config['grid_shape'].
         """
-        # if type(key) is tuple:
-        #     self.set_subgrid(key[0], key[1:], value)
-        # else:
-        #     self.set_grid(key, value)
         if type(key) is tuple and type(key[0]) in (list, range, slice):
             ## multiple subgrids
-            # print(key[0])
             nk = key[0]
             if type(nk) is slice:
                 nk = range(nk.start,nk.stop,(nk.step if nk.step else 1))
             self.set_subgrids(nk, key[1:], value)
+
         elif type(key) in [range, slice] or \
              type(key) is tuple and not type(key[1]) in (np.ndarray, list, range, slice):
             ## multiple Grids
-            # print (type(key[1]))
             if type(key) is slice:
                 key = range(key.start,key.stop,(key.step if key.step else 1))
             self.set_grids(key, value) 
+
         elif type(key) is tuple and len(key) > 1: ## single subgrid
             self.set_subgrid(key[0], key[1:], value)   
+
         else:
             self.set_grid(key, value)
 
@@ -294,7 +266,7 @@ class MultiGrid (object):
         Parameters
         ----------
         *args: list
-            Variable length list of arguments. Needs 3 itmes.
+            Variable length list of arguments. Needs 3 items.
             where the first is the number of rows in each grid, the
             second is the number of columns, and the third is the 
             number of grids in the MultiGrid. All other values are
@@ -309,7 +281,7 @@ class MultiGrid (object):
                 in the AOI.
                 Defaults to None, which generates a mask that sets all 
                 grid cells to be part of the AOI
-            'grid_names': list of names for each grid in the MultGird, 
+            'grid_names': list of names for each grid in the MultiGird, 
                 Defaults None.
             'filename': name of file if using memmap as data_model.
                 Defaults to None, which will create a temp file.
@@ -327,32 +299,32 @@ class MultiGrid (object):
         config = {}
         config['grid_shape']= (args[0], args[1])
         config['num_grids'] = args[2]
-        config['memory_shape'] = self.get_memory_shape(config)
-        config['real_shape'] = self.get_real_shape(config)
-        config['data_type'] = load_or_use_default(
+        config['memory_shape'] = self.find_memory_shape(config)
+        config['real_shape'] = self.find_real_shape(config)
+        config['data_type'] = common.load_or_use_default(
             kwargs, 'data_type', 'float32'
         )
-        config['mode'] = load_or_use_default(kwargs, 'mode', 'r+')
-        config['dataset_name'] = load_or_use_default(
+        config['mode'] = common.load_or_use_default(kwargs, 'mode', 'r+')
+        config['dataset_name'] = common.load_or_use_default(
             kwargs, 'dataset_name', 'Unknown'
         )
 
-        config['mask'] = load_or_use_default(kwargs, 'mask', None)
+        config['mask'] = common.load_or_use_default(kwargs, 'mask', None)
 
         if config['mask'] is None:
             config['mask'] = \
                 np.ones(config['grid_shape']) == \
                 np.ones(config['grid_shape'])
 
-        grid_names = load_or_use_default(kwargs, 'grid_names', [])
+        grid_names = common.load_or_use_default(kwargs, 'grid_names', [])
         
         if len(grid_names) > 0 and config['num_grids'] != len(grid_names):
-            raise GridSizeMismatchError( 'grid name size mismatch' )
+            raise common.GridSizeMismatchError( 'grid name size mismatch' )
         config['grid_name_map'] = self.create_name_map(grid_names)
             
 
-        config['filename'] = load_or_use_default(kwargs, 'filename', None)
-        config['data_model'] = load_or_use_default(
+        config['filename'] = common.load_or_use_default(kwargs, 'filename', None)
+        config['data_model'] = common.load_or_use_default(
             kwargs, 'data_model', 'memmap'
         )
         if config['data_model'] != 'memmap':
@@ -360,7 +332,7 @@ class MultiGrid (object):
 
         grids = self.setup_internal_memory(config)
         
-        init_data = load_or_use_default(kwargs, 'initial_data', None)
+        init_data = common.load_or_use_default(kwargs, 'initial_data', None)
         
 
         if not init_data is None:
@@ -388,8 +360,8 @@ class MultiGrid (object):
         with open(file) as conf_text:
             config = yaml.load(conf_text, Loader=yaml.Loader)
         config['cfg_path'] = os.path.split(file)[0]
-        config['memory_shape'] = self.get_memory_shape(config)
-        config['real_shape'] = self.get_real_shape(config)
+        config['memory_shape'] = self.find_memory_shape(config)
+        config['real_shape'] = self.find_real_shape(config)
         grids = self.setup_internal_memory(config)
 
         if type(config['mask']) is str and os.path.isfile(config['mask']):
@@ -546,20 +518,34 @@ class MultiGrid (object):
             by getter functions with filters is set via set_filter() call
         force: bool,  default False
             if True existing fliters named `name` are overwritten
-        
-        """
 
+        Raises
+        ------
+        MultigridFilterError:
+            Raised if filter by `name` exists and force is false or if 
+            shape of `data` is note equal to `grid_shape`
+        """
         if name in self.filters and force == False:
             raise MultigridFilterError("filters contains %s filter" % name)
 
         if data.shape != self.config['grid_shape']:
             raise MultigridFilterError("filter shape does not match grid shape")
-
     
         self.filters[name] = data
 
     def set_filter(self, name):
-        """
+        """set a filter 
+
+        Parameters
+        ----------
+        name: str or None
+            if None: filters are unset
+            else: filter is set based on name
+        
+        Raises
+        ------
+        MultigridFilterError
+            When the filter name is invalid
         """
         if name in self.filters or name is None:
             self.current_filter = name
@@ -591,7 +577,7 @@ class MultiGrid (object):
                 filename = os.path.join(mkdtemp(), 'temp.dat')
                 self._is_temp = True
             # print('a', type(self), config['memory_shape'])
-            grids = open_or_create_memmap_grid(
+            grids = common.open_or_create_memmap_grid(
                 filename, 
                 config['mode'], 
                 config['data_type'], 
@@ -603,7 +589,7 @@ class MultiGrid (object):
             grids = np.zeros(config['memory_shape'])
         return grids 
     
-    def get_memory_shape (self, config):
+    def find_memory_shape (self, config):
         """Construct the shape needed for multigrid in memory from 
         configuration. 
 
@@ -620,7 +606,7 @@ class MultiGrid (object):
         return (config['num_grids'], 
             config['grid_shape'][0] * config['grid_shape'][1])
         
-    def get_real_shape (self, config):
+    def find_real_shape (self, config):
         """Construct the shape that represents the real shape of the 
         data for the MultiGird.
 
@@ -637,7 +623,7 @@ class MultiGrid (object):
         return (config['num_grids'], 
             config['grid_shape'][0], config['grid_shape'][1])
 
-    def get_grid_number(self, grid_id):
+    def find_grid_number(self, grid_id):
         """Get the Grid number for a grid id
         
         Parameters
@@ -654,7 +640,7 @@ class MultiGrid (object):
         return grid_id if type(grid_id) is int \
                        else self.config['grid_name_map'][grid_id]
     
-    def get_grid_slice(self, start = None, end = None, step = None):
+    def find_grid_slice(self, start = None, end = None, step = None):
         """Get grid id slice from multigrid keys
 
         parameters
@@ -670,13 +656,13 @@ class MultiGrid (object):
         -------
         slice
         """
-        start = self.get_grid_number(start) if start else None
-        end = self.get_grid_number(end) if end else None
+        start = self.find_grid_number(start) if start else None
+        end = self.find_grid_number(end) if end else None
         step = step if step else 1
 
         return slice(start, end, step)
 
-    def get_grid_range(self, start = None, end = None, step = 1):
+    def find_grid_range(self, start = None, end = None, step = 1):
         """Get grid id range from multigrid keys
 
         parameters
@@ -692,11 +678,32 @@ class MultiGrid (object):
         -------
         slice
         """
-        start = self.get_grid_number(start) if start else 0
-        end = self.get_grid_number(end) if end else len(self.grids)
+        start = self.find_grid_number(start) if start else 0
+        end = self.find_grid_number(end) if end else len(self.grids)
         step = step if step else 1
   
-        return range(start, end, step)        
+        return range(start, end, step)      
+
+    def find_grid_numbers(self, grid_ids):
+        """Find the grid numbers for a list, range or slice of grid_ids
+
+        Parameters
+        ----------
+        grid_ids: list, range, or slice
+            grid ids to find numbers for
+
+        returns
+        -------
+        list or range
+            Grid numbers for ids
+        """
+        if not type(grid_ids) in [slice, range]:
+            grid_ids = [self.find_grid_number(gid) for gid in grid_ids]
+        else:
+            grid_ids = self.find_grid_range(
+                grid_ids.start, grid_ids.stop, grid_ids.step
+            )  
+        return grid_ids
 
     def get_grid(self, grid_id, flat = True):
         """Get a grid
@@ -715,7 +722,7 @@ class MultiGrid (object):
             1d if flat, 2d otherwise.
             Filter is applied if `set_filter` has been called
         """
-        grid_id = self.get_grid_number(grid_id)
+        grid_id = self.find_grid_number(grid_id)
 
         _filter = self.current_filter
         _filter = self.filters[_filter].flatten() if _filter else 1
@@ -766,12 +773,7 @@ class MultiGrid (object):
             2d if flat, 3d otherwise.
             Filter is applied if `set_filter` has been called
         """
-        if not type(grid_ids) in [slice, range]:
-            grid_ids = [self.get_grid_number(gid) for gid in grid_ids]
-        else:
-            grid_ids = self.get_grid_range(
-                grid_ids.start, grid_ids.stop, grid_ids.step
-            )
+        grid_ids = self.find_grid_numbers(grid_ids)
 
         _filter = self.current_filter
         _filter = self.filters[_filter].flatten() if _filter else 1
@@ -803,6 +805,7 @@ class MultiGrid (object):
         """
         # print(index)
         grids = self.get_grids(grid_ids, False)
+
         if type(index) is tuple and len(index) == 2:
             index = slice(None,None), index[0], index[1]
         elif type(index) is tuple and len(index) == 1:
@@ -827,7 +830,7 @@ class MultiGrid (object):
         new_grid: np.array like, or number
             Grid to set. must be able to reshape to grid_shape.
         """
-        grid_id = self.get_grid_number(grid_id)
+        grid_id = self.find_grid_number(grid_id)
 
         try:
             self.grids[grid_id] = new_grid.flatten()
@@ -847,7 +850,7 @@ class MultiGrid (object):
         new_gird: 
             values that can be broadcast in to shape of index
         """
-        grid_id = self.get_grid_number(grid_id)
+        grid_id = self.find_grid_number(grid_id)
 
         self.grids[grid_id].reshape(self.config['grid_shape'])[index] = new_grid
         
@@ -863,12 +866,7 @@ class MultiGrid (object):
             then there is a single grid to set for all keys provided
             otherwise there is a new grid for each
         """
-        if not type(grid_ids) in [slice, range]:
-            grid_ids = [self.get_grid_number(gid) for gid in grid_ids]
-        else:
-            grid_ids = self.get_grid_range(
-                grid_ids.start, grid_ids.stop, grid_ids.step
-            )
+        grid_ids = self.find_grid_numbers(grid_ids)
 
         shape =  self.config['grid_shape']
     
@@ -896,12 +894,7 @@ class MultiGrid (object):
             then there is a single grid to set for all keys provided
             otherwise there is a new grid for each
         """
-        if not type(grid_ids) in [slice, range]:
-            grid_ids = [self.get_grid_number(gid) for gid in grid_ids]
-        else:
-            grid_ids = self.get_grid_range(
-                grid_ids.start, grid_ids.stop, grid_ids.step
-            )
+        grid_ids = self.find_grid_numbers(grid_ids)
 
         shape = self.config['grid_shape']
         sub_shape = self.grids[0].reshape(shape)[index].shape
@@ -967,6 +960,8 @@ class MultiGrid (object):
 
     def save_as_geotiff(self, filename, grid_id, **kwargs):
         """save a grid as a tiff file
+
+        TODO: fix datatype
         """
         if gdal is None:
             raise IOError("gdal not found: cannot save tif")
@@ -981,16 +976,13 @@ class MultiGrid (object):
         #         projection = self.config['raster_metadata'].projection
         except KeyError:
             raise IOError("No Raster Metadata Found: cannot save tiff")
+        
         datatype = gdal.GDT_Float32
 
-        # print (projection)
-        
-        # print (transform)
+
         data = self[grid_id].astype(np.float32)
 
         raster.save_raster(filename, data, transform, projection, datatype)
-
-
 
     def save_all_as_geotiff(self, dirname, **kwargs):
         """save all grid as a tiff file
@@ -1020,15 +1012,10 @@ class MultiGrid (object):
             )
             self.save_as_geotiff(filename, grid, **kwargs)
 
-    def get_range(self):
-        """get the range of time steps"""
-        return range(
-            self.config['start_timestep'], 
-            self.config['start_timestep'] + self.config['num_timesteps']
-        )
-
-    def get_as_ml_features(self, grid, mask = None, train_range=None ):
+    def as_ml_features(self, grid, mask = None, train_range=None ):
         """Get the data in a way that can be used in ML methods
+
+        TODO:fix get_range
         """
         features = []
         if mask is None:
@@ -1149,7 +1136,6 @@ class MultiGrid (object):
             top_l = transforms.to_pixel(top_l, transform).astype(int)
             bottom_r = transforms.to_pixel(bottom_r, transform).astype(int)
 
-        
         if verbose:
             print ('top left', top_l)
             print ('bottom right', bottom_r)
@@ -1184,8 +1170,6 @@ class MultiGrid (object):
             raster_meta, top_l, bottom_r
         )
 
-
-
         for idx in range(len(self.grids)):
             grid = self.grids[idx].reshape(self.config['grid_shape'])
             zoom = raster.zoom_box(
@@ -1207,7 +1191,6 @@ class MultiGrid (object):
                 copy.deepcopy(top_l), copy.deepcopy(bottom_r)
             )
             view.add_filter(filter, filter_data )
-
 
         return view
 
@@ -1396,6 +1379,8 @@ class MultiGrid (object):
         return np.array(zoom_ts)
 
     def get_max_locations(self, location_format="ROWCOL", verbose=False, top_n = 3, start_at=0):
+        """This gets the max values 
+        """
 
         max_map = {}
         transform = self.config['raster_metadata']['transform']
@@ -1441,42 +1426,30 @@ class MultiGrid (object):
                 count -= 1
             
         return max_map
-        
- 
 
-    def get_grids_at_keys(self, keys):
-        """return the grids for the given keys
-
-        Parameters
-        ----------
-        keys: list
-            list of grids
-        
-        Returns
-        -------
-        np.array
-        """
-        select = np.zeros([ 
-            len(keys), 
-            self.config['grid_shape'][0],
-            self.config['grid_shape'][1]
-        ])
-        c = 0
-        for k in keys:
-            select[c] = self[k]
-            c += 1
-        return select
-
-    def calc_statistics_for (self, keys, stat_fucn=np.mean, axis = 0):
+    def calc_statistics_for(
+            self, keys, stat_func=np.mean, axis = 0, flat=False
+        ):
         """Calculate the statstics for a given substet of grids
 
         Parameters
         ----------
-        keys: list
-            list of keys into the multigrid
+        keys: list, or range
+            Items should be int or str Multigird key values 
+        stat_func: function, default np.mean
+            a function at operates on numpy arrays
+        axis: int, default 0
+            axis along which to apply function
+        flat: bool, default False
+            if True results are a flattened array
+        
+        Returns
+        -------
+        np.array:
+            value from statistic function
         """
-        data = self.get_grids_at_keys(keys)
-        return stat_fucn(data, axis)
+        data = self.get_grids(keys, flat)
+        return stat_func(data, axis)
 
     def clone(self):
         """

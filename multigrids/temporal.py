@@ -1,3 +1,9 @@
+"""
+Temporal Multigrid
+------------------
+
+a class for multivariable grided temporal data
+"""
 from .multigrid import MultiGrid
 import numpy as np
 import yaml
@@ -52,7 +58,7 @@ class TemporalMultiGrid (MultiGrid):
                 common.load_or_use_default(kwargs, 'start_timestep', 0)
         self.current_grids = self.grids[0]
 
-    def get_memory_shape (self,config):
+    def find_memory_shape (self,config):
         """Construct the shape needed for multigrid in memory from 
         configuration. 
 
@@ -71,7 +77,7 @@ class TemporalMultiGrid (MultiGrid):
             config['grid_shape'][0] * config['grid_shape'][1]
         )
 
-    def get_real_shape (self, config):
+    def find_real_shape (self, config):
         """Construct the shape that represents the real shape of the 
         data for the MultiGird.
 

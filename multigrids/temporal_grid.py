@@ -90,26 +90,7 @@ class TemporalGrid (MultiGrid):
         mg_config.update(config)
         return mg_config, grids
 
-    # def __getitem__(self, key): 
-    #     """ Get item function
-        
-    #     Parameters
-    #     ----------
-    #     key: str, int, or tuple
-
-    #     Returns
-    #     -------
-    #     np.array like
-    #     """
-    #     if type(key) in (str,):
-    #         key = self.get_grid_number(key)
-    #     else:
-    #         # print (key)
-    #         key -= self.config['start_timestep']
-            
-    #     return super().__getitem__(key)
-
-    def get_grid_number(self, grid_id):
+    def find_grid_number(self, grid_id):
         """Get the Grid number for a grid id
         
         Parameters
@@ -131,9 +112,9 @@ class TemporalGrid (MultiGrid):
             else:
                 raise IndexError('start_timestep <= timestep <= end_timestep')
         
-        return super().get_grid_number(grid_id)
+        return super().find_grid_number(grid_id)
 
-    def get_memory_shape (self,config):
+    def find_memory_shape (self,config):
         """ Construct the shape needed for multigrid in memory from 
         configuration. 
 
@@ -152,7 +133,7 @@ class TemporalGrid (MultiGrid):
             config['grid_shape'][0] * config['grid_shape'][1]
         )
 
-    def get_real_shape (self, config):
+    def find_real_shape (self, config):
         """Construct the shape that represents the real shape of the 
         data for the MultiGird.
 
@@ -192,6 +173,14 @@ class TemporalGrid (MultiGrid):
         self.grid = self.grids[self.timestep]
         
         return self.current_timestep()
+    
+    def get_range(self):
+        """get the range of time steps"""
+        return range(
+            self.config['start_timestep'], 
+            self.config['start_timestep'] + self.config['num_timesteps']
+        )
+    
 
     def save_clip(self, filename, clip_func=clip.default, clip_args={}):
         """
