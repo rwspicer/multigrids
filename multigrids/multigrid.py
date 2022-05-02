@@ -638,6 +638,53 @@ class MultiGrid (object):
         return grid_id if type(grid_id) is int \
                        else self.config['grid_name_map'][grid_id]
     
+    def get_grid_slice(self, start = None, end = None, step = None):
+        """Get grid id slice from multigrid keys
+
+        parameters
+        ----------
+        start: int or str
+            start key
+        end: int or str
+            end key
+        step: int
+            step for slice
+
+
+        returns
+        -------
+        slice
+        """
+        start = self.get_grid_number(start) if start else None
+        end = self.get_grid_number(end) if end else None
+        step = self.get_grid_number(step) if step else None
+
+        return slice(start, end, step)
+
+    def get_grid_range(self, start = None, end = None, step = None):
+        """Get grid id range from multigrid keys
+
+        parameters
+        ----------
+        start: int or str
+            start key
+        end: int or str
+            end key
+        step: int
+            step for slice
+
+
+        returns
+        -------
+        slice
+        """
+        start = self.get_grid_number(start) if start else 0
+        end = self.get_grid_number(end) if end else None
+        step = self.get_grid_number(step) if step else 1
+
+        return range(start, end, step)        
+
+        
     def get_grid(self, grid_id, flat = True):
         """Get a grid
         
@@ -778,7 +825,7 @@ class MultiGrid (object):
             if an int,  it should be the grid number.
             if a str, it should be a grid name.
         index: slice of tuple of slices, or other index
-            index into grid
+            index that is within grid_shape
         new_gird: 
             values that can be broadcast in to shape of index
         """
@@ -786,6 +833,71 @@ class MultiGrid (object):
 
         self.grids[grid_id].reshape(self.config['grid_shape'])[index] = new_grid
         
+    def set_grids(self, grid_ids, new_grids):
+        """Set a set of grids
+        
+        Parameters
+        ----------
+        grid_ids: list, or range
+            Items should be int or str Multigird key values 
+        new_grids: np.array like
+            if new_girds.shape can be broadcast in to `grid_shape` 
+            then there is a single grid to set for all keys provided
+            otherwise there is a new grid for each
+        """
+        if not type(grid_ids) in [slice, range]:
+            grid_ids = [self.get_grid_number(gid) for gid in grid_ids]
+        else:
+            grid_ids = self.get_grid_range(
+                grid_ids.start, grid_ids.stop, grid_ids.step
+            )
+
+        shape =  self.config['grid_shape']
+    
+        for idx, grid_id in enumerate(grid_ids):
+            ## if new_girds shape can be broadcast in to `grid_shape` 
+            ## then there is a single grid to set for all keys provided
+            ## otherwise there is a new grid for each
+            if new_grids.shape == shape or new_grids.shape == (np.prod(shape),):
+                self.grids[grid_id] = new_grids.flatten()
+            else:
+                self.grids[grid_id] = new_grids[idx].flatten()
+
+    def set_subgrids(self, grid_ids, index, new_grids):
+        """Set a set of grids
+        
+        Parameters
+        ----------
+        grid_ids: list, or range
+            Items should be int or str Multigird key values 
+        index: int, slice, list, range, np.array, or tuple
+                containing two of any of those
+            index that is within grid_shape
+        new_grids: np.array like
+            if new_girds.shape can be broadcast in to `grid_shape` 
+            then there is a single grid to set for all keys provided
+            otherwise there is a new grid for each
+        """
+        if not type(grid_ids) in [slice, range]:
+            grid_ids = [self.get_grid_number(gid) for gid in grid_ids]
+        else:
+            grid_ids = self.get_grid_range(
+                grid_ids.start, grid_ids.stop, grid_ids.step
+            )
+
+        shape = self.config['grid_shape']
+        sub_shape = self.grids[0].reshape(shape)[index].shape
+
+        for idx, grid_id in enumerate(grid_ids):
+            if new_grids.shape == sub_shape or \
+                        (len(new_grids.shape) == 1 and \
+                        new_grids.shape[0] == np.prod(sub_shape)):
+                self.grids[grid_id].reshape(shape)[index] = \
+                    new_grids.reshape(sub_shape)
+            else:
+                self.grids[grid_id].reshape(shape)[index] = \
+                    new_grids[idx].reshape(sub_shape)
+
     def save_figure(
             self, grid_id, filename, figure_func=figures.default, figure_args={}, data=None
         ):
