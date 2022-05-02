@@ -63,11 +63,10 @@ def open_or_create_memmap_grid(filename, mode, dtype, shape):
         del(grids)
     return np.memmap(filename, dtype=dtype, mode=mode, shape=shape)
     
-
 class MultiGrid (object):
     """
-        A class to represent a set of multiple related grids of the same 
-        dimensions. Implemented usin gnumpy arrays.
+    A class to represent a set of multiple related grids of the same 
+    dimensions. Implemented using memory mapped numpy arrays.
 
     Parameters
     ----------
@@ -254,8 +253,26 @@ class MultiGrid (object):
         value: np.array like
             Grid that is set. Should have shape of self.config['grid_shape'].
         """
-        if type(key) is tuple:
-            self.set_subgrid(key[0], key[1:], value)
+        # if type(key) is tuple:
+        #     self.set_subgrid(key[0], key[1:], value)
+        # else:
+        #     self.set_grid(key, value)
+        if type(key) is tuple and type(key[0]) in (list, range, slice):
+            ## multiple subgrids
+            # print(key[0])
+            nk = key[0]
+            if type(nk) is slice:
+                nk = range(nk.start,nk.stop,(nk.step if nk.step else 1))
+            self.set_subgrids(nk, key[1:], value)
+        elif type(key) in [range, slice] or \
+             type(key) is tuple and not type(key[1]) in (np.ndarray, list, range, slice):
+            ## multiple Grids
+            # print (type(key[1]))
+            if type(key) is slice:
+                key = range(key.start,key.stop,(key.step if key.step else 1))
+            self.set_grids(key, value) 
+        elif type(key) is tuple and len(key) > 1: ## single subgrid
+            self.set_subgrid(key[0], key[1:], value)   
         else:
             self.set_grid(key, value)
 
