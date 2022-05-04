@@ -56,7 +56,7 @@ class TemporalGrid (MultiGrid):
         # self.config['start_timestep'] = 0
 
     def reset_grid_name_map(self, delta_timestep):
-
+        """"""
         delta_timestep = delta_timestep.lower()
         if delta_timestep == "year":
             self.config['delta_timestep'] = "year"
@@ -216,7 +216,6 @@ class TemporalGrid (MultiGrid):
         subset.config['start_timestep'] = subset_grids[0]
         subset.config['timestep'] = subset_grids[0]
         
-
         return subset
 
     def clip_grids(self, extent, location_format="ROWCOL", verbose=False):

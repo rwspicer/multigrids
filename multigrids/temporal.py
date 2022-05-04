@@ -173,215 +173,495 @@ class TemporalMultiGrid (MultiGrid):
             config['grid_shape'][0] , config['grid_shape'][1]
         )
 
-    def __getitem__(self, key): 
-        """ Get item function
+    def  __getitem__(self, key): 
+        # print(key)
+        index = None
+        timesteps = None
+        grids = None
+
+        if type(key) in [range, slice, list, set, int, str]: ## slice, list, or single timestep
+            key = [key]
         
-        Parameters
-        ----------
-        key: str, int, or tuple
-            str keys should be grid names
-            int keys should be a time step
-            tuple keys should be (str, int or slice), where the str is a 
-                grid name, and the int or slice are indexes
-
-        Returns
-        -------
-        np.array like
-            if key is str: returns grid 'grid_name' at all time steps
-            if key is int: returns all grids at timestep
-            if key is tuple: returns grid 'grid_name' at requested time step(s)
-        """
-        ## this key is used to access the data at the end 
-        ## of the function. it is modied based on key
-        # print self.grid_name_map
-        # print key,  self.config['start_timestep']
-        access_key = [slice(None,None) for i in range(3)]
-        if common.is_grid(key):
-            # print 'a'
-            # gets the grid at all timesteps
-            access_key[1] = self.get_grid_number(key)
-        elif common.is_grid_with_range(key):
-            # print 'b'
-            access_key[0] = slice(
-                key[1].start - self.config['start_timestep'],
-                key[1].stop - self.config['start_timestep']
-            )
-            access_key[1] = self.get_grid_number(key[0])
-        elif common.is_grid_with_index(key):
-            # print 'c'
-            access_key[0] = key[1] - self.config['start_timestep']
-            ac_1 = self.get_grid_number(key[0])
-            if type(ac_1) is slice:
-                ac_1 = ac_1.start
-            access_key[1] = ac_1
-        elif type(key) is int:
-            # print 'd'
-            access_key = key - self.config['start_timestep']
-        # elif type(key) is slice: TODO NEED some changes to implement this
-        #                               but it's not very important to do
-        #     access_key = slice(
-        #         key.start - self.config['start_timestep'],
-        #         key.stop - self.config['start_timestep']
-        #     )
-        else:
-            raise KeyError( 'Not a key for Temporal Multi Grid: '+ str(key))
-        # print 'key', access_key, type(access_key)
-        # print access_key
-
-        data = self.grids.reshape(self.config['real_shape'])[access_key]
-
-        _filter = self.filters[self.current_filter] if self.current_filter else 1
-        if _filter == 1:
-            return data
-
-        if data.shape == self.config['grid_shape']:
-            data *= _filter
-        else:
-            for i in range(data.shape[0]):
-                data[i] *= _filter
-
-        return data
-
-    def __setitem__ (self ,key, value):
-        """ Set item function
-
-        Sets grids for a given key
-        
-        Parameters
-        ----------
-        key: str, int, or tuple
-            str keys should be grid names
-            int keys should be a time step
-            tuple keys should be (str, int or slice), where the str is a 
-                grid name, and the int or slice are indexes
-        value: np.array like
-            shape must match shape of data returned by getitem
-            with the same key
-        """
-        
-        access_key = [slice(None,None) for i in range(3)]
-        if common.is_grid(key):
-            # gets the grid at all timesteps
-            # print 'a'
-            access_key[1] = self.get_grid_number(key)
-        elif common.is_grid_with_range(key):
-            # print key
-            # print 'b'
-            access_key[0] = slice(
-                key[1].start - self.config['start_timestep'],
-                key[1].stop - self.config['start_timestep']
-            )
-            access_key[1] = self.get_grid_number(key[0])
-        elif common.is_grid_with_index(key):
-            # print 'c'
-            access_key[0] = key[1] - self.config['start_timestep']
-            access_key[1] = self.get_grid_number(key[0])
-        elif type(key) is int:
-            # print 'd'
-            access_key = key - self.config['start_timestep']
-        else:
-            raise KeyError( 'Not a key for Temporal Multi Grid: '+ str(key))
-        
-        shape = self.grids[access_key].shape
-        if type(value) in (int,float,str,bool):
-            value = np.full(shape, value)
-        self.grids[access_key] = value.reshape(shape)
-
-    def get_grid(self, grid_id, time_step, flat = True):
-        """Get a grid at a time step
-        
-        Parameters
-        ----------
-        grid_id: int or str
-            if an int, it should be the grid number.
-            if a str, it should be a grid name.
-        time_step: int
-            time step to get grid at
-        flat: bool, defaults true
-            returns the grid as a flattened array.
-
-        Returns
-        -------
-        np.array
-            1d if flat, 2d otherwise.
-        """
-        shape = \
-            self.config['memory_shape'][-1] \
-            if flat else self.config['grid_shape']
-        return self.get_grid_over_time(
-            grid_id, time_step, time_step+1
-        ).reshape(shape)
-        
-    def get_grid_over_time(self, grid_id, start, stop, flat = True):
-        """Get a grid at a time step
-        
-        Parameters
-        ----------
-        grid_id: int or str
-            if an int, it should be the grid number.
-            if a str, it should be a grid name.
-        start: int
-            start time step to get grid at
-        stop: int
-            end time step to get grid at
-        flat: bool, defaults true
-            returns the grid as a flattened array.
-
-        Returns
-        -------
-        np.array
-            2d if flat, 3d otherwise.
-        """
-        if not start is None:
-            start += self.config['start_timestep']
-        if not stop is None:
-            stop += self.config['start_timestep']
-        rows, cols = self.config['grid_shape'][0], self.config['grid_shape'][1]
-        if start is None and stop is None:
-            shape = (self.num_timesteps, rows, cols )
-            if flat:
-                shape = (self.num_timesteps, rows* cols )
-            # print shape
-            return self[grid_id].reshape(shape)
+        if len(key) > 4 and not all([type(i) in [int, str] for i in key]):
             
-        shape = (stop-start, rows, cols)
+            raise IndexError ( 'Index has too many dimensions' )
+
+        if 3 <= len(key) <=4:
+            index = key[2:]
+           
+
+        if len(key) > 1:
+            grids = key[1]
+        timesteps = key[0]
+        # print (timesteps, grids, index)
+
+
+        if index is None: #whole grids
+
+            if grids is None or grids == slice(None):
+                return self.get_grids(timesteps, False)
+            elif timesteps == slice(None):
+                return self.get_grids(grids, False)
+            else:
+                if type(timesteps) in [str, int]:
+                    timesteps = [timesteps]
+                grid_ids = []
+                if type(grids) in [str, int]:
+                    grids = [grids]
+                for ts in timesteps:
+                    for gn in grids:
+                        grid_ids.append((ts, gn))
+                if len(grid_ids) == 1:
+                    return self.get_grid(grid_ids[0], False)
+                return self.get_grids(grid_ids, False)
+
+
+        else: 
+            if grids is None or grids == slice(None):
+                return self.get_subgrids(timesteps, index, False)
+            elif timesteps == slice(None):
+                return self.get_subgrids(grids, index, False)
+            else:
+                if type(timesteps) in [str, int]:
+                    timesteps = [timesteps]
+                grid_ids = []
+                if type(grids) in [str, int]:
+                    grids = [grids]
+                for ts in timesteps:
+                    for gn in grids:
+                        grid_ids.append((ts, gn))
+                if len(grid_ids) == 1:
+                    return self.get_subgrid(grid_ids[0], index, False)
+                return self.get_subgrids(grid_ids, index, False)
+
+
+    def  __setitem__(self, key, value): 
+        # print(key)
+        index = None
+        timesteps = None
+        grids = None
+
+        if type(key) in [range, slice, list, set, int, str]: ## slice, list, or single timestep
+            key = [key]
+        
+        if len(key) > 4 and not all([type(i) in [int, str] for i in key]):
+            
+            raise IndexError ( 'Index has too many dimensions' )
+
+        if 3 <= len(key) <=4:
+            index = key[2:]
+           
+
+        if len(key) > 1:
+            grids = key[1]
+        timesteps = key[0]
+        # print (timesteps, grids, index)
+
+
+        if index is None: #whole grids
+
+            if grids is None or grids == slice(None):
+                return self.set_grids(timesteps, value)
+            elif timesteps == slice(None):
+                return self.set_grids(grids, value)
+            else:
+                if type(timesteps) in [str, int]:
+                    timesteps = [timesteps]
+                grid_ids = []
+                if type(grids) in [str, int]:
+                    grids = [grids]
+                for ts in timesteps:
+                    for gn in grids:
+                        grid_ids.append((ts, gn))
+                if len(grid_ids) == 1:
+                    return self.set_grid(grid_ids[0], value)
+                return self.set_grids(grid_ids, value)
+
+
+        else: 
+            if grids is None or grids == slice(None):
+                return self.set_subgrids(timesteps, value)
+            elif timesteps == slice(None):
+                return self.set_subgrids(grids, value)
+            else:
+                if type(timesteps) in [str, int]:
+                    timesteps = [timesteps]
+                grid_ids = []
+                if type(grids) in [str, int]:
+                    grids = [grids]
+                for ts in timesteps:
+                    for gn in grids:
+                        grid_ids.append((ts, gn))
+                if len(grid_ids) == 1:
+                    return self.set_subgrid(grid_ids[0], value)
+                return self.set_subgrids(grid_ids, value)
+
+   
+
+    
+
+    def convert_grid_numbers_to_index(self, grid_numbers):
+
+        grid_numbers = np.array(grid_numbers)  
+        return grid_numbers[:,0], grid_numbers[:,1]
+
+    def find_grid_number(self, grid_id):
+        """Get the Grid number for a grid id
+        
+        Parameters
+        ----------
+        grid_id: int or str
+            if an int, it should be the grid number.
+            if a str, it should be a grid name.
+
+        Returns
+        -------
+        int
+            gird id
+        """
+        if type(grid_id) is int:
+            start = self.config['start_timestep']
+            end =  start + self.config['num_timesteps']
+            if start <= grid_id <= end:
+                return grid_id - start
+            else:
+                raise IndexError('start_timestep <= timestep <= end_timestep')
+        
+        return super().find_grid_number(grid_id)
+
+    def find_grid_slice(self, start = None, end = None, step = None):
+        """Get grid id slice from multigrid keys
+
+        parameters
+        ----------
+        start: int or str
+            start key
+        end: int or str
+            end key
+        step: int
+            step for slice
+
+        Returns
+        -------
+        slice
+        """
+        step = step if step else 1
+        return self.find_grid_range(start, end, step)
+
+
+    def find_grid_range(self, start = None, end = None, step = 1):
+        """Get grid id range from multigrid keys
+
+        parameters
+        ----------
+        start: int or str
+            start key
+        end: int or str
+            end key
+        step: int
+            step for slice
+
+        returns
+        -------
+        slice
+        """
+        if not type(start) is tuple:
+            return super().find_grid_range(start, end, step)
+
+        range_list = []
+        in_range = False
+        counter = 0
+        for key in list(self.config['grid_name_map'].keys()):
+            if key == start:
+                in_range = True
+            if key == end:
+                in_range = False   
+            if in_range:
+                if counter == 0:
+                    range_list.append(self.find_grid_number(key))
+                counter += 1
+                if counter == step:
+                    counter = 0
+        return range_list
+
+    def find_grid_numbers(self, grid_ids):
+        """Find the grid numbers for a list, range or slice of grid_ids
+
+        Parameters
+        ----------
+        grid_ids: list, range, or slice
+            grid ids to find numbers for
+
+        returns
+        -------
+        list or range
+            Grid numbers for ids
+        """
+        if grid_ids in self.grid_id_list():
+            grid_ids = [grid_ids]
+        
+        if not type(grid_ids) in [slice, range]:
+
+            # if type(grid_ids) in [list, tuple] and len(grid_ids) == 2 and \
+            #         type(grid_ids[0]) in [slice, range, tuple, set, list] and \
+            #             grid_ids[1] in self.grid_id_list() or \
+            #             type(grid_ids[1]) in [tuple, set, list]:
+            #     temp = []
+            #     grid_names = grid_ids[1]
+            #     if grid_names in self.grid_id_list():
+            #         grid_names = [grid_names]
+                
+            #     for ts in grid_ids[0]:
+            #         for name in grid_names:
+            #             temp.append((ts, name))
+            #     grid_ids = temp
+            #     print(grid_ids)
+
+            if type(grid_ids) is int:
+                return self.find_grid_number(grid_ids)
+            if all([gid in  self.grid_id_list() for gid in grid_ids]):
+                temp = []
+                for grid_id in grid_ids:
+                    for key in self.config['grid_name_map']:
+                        if key[1] == grid_id:
+                            temp.append(key)
+                grid_ids = sorted(temp)
+
+            grid_ids = [self.find_grid_number(gid) for gid in grid_ids]
+            # grid_ids = self.convert_grid_numbers_to_index(grid_ids)
+        else:
+            if type(grid_ids.start) is int and type(grid_ids.start) is int:
+                step = grid_ids.step
+            else:
+                step = 1
+            grid_ids = self.find_grid_range(
+                grid_ids.start, grid_ids.stop, step
+            )  
+        return grid_ids
+    
+    # def find_grid_id_at_all_timesteps(self, grid_id):
+    #     """
+    #     """
+    #     range_list = []
+    #     for key in list(self.config['grid_name_map'].keys()):
+    #         if key[1] == grid_id:
+    #             range_list.append(key)
+    #     return range_list
+
+    # def find_grid_number_at_all_timesteps(self, grid_id):
+    #     """
+    #     """
+    #     range_list = []
+    #     for key in self.find_grid_id_at_all_timesteps(grid_id):
+    #         range_list.append(self.find_grid_number(key))
+    #     return range_list
+
+   
+    def get_grid(self, grid_id, flat=True):
+        """Get a grid given grid id pair (timestep, grid_id)
+        """
+        ## filters carry over from get_grids_at_timestep
+        g_num = self.find_grid_number(grid_id)[1]
+        return self.get_grids(grid_id[0], flat)[g_num]
+
+    def get_subgrid(self, grid_id, index,  flat = True):
+        """Get a subgrid given grid id pair (timestep, grid_id), and index
+        """
+        ## filters carry over from get_grid
+        subgrid = self.get_grid(grid_id, False)[index]
+
         if flat:
-            shape = (shape[0], rows * cols)
-        # print shape
-        return self[grid_id, slice(start,stop)].reshape(shape)
+            return subgrid.flatten() 
+        return subgrid
 
-    def set_grid(self, grid_id, time_step, new_grid):
-        """ Set a grid at a timestep
-         Parameters 
-        ----------
-        grid_id: int or str
-            if an int, it should be the grid number.
-            if a str, it should be a grid name.
-        time_step: int
-            time step to get grid at
-        new_grid: np.array like
-            Grid to set. must be able to reshape to grid_shape.
+    def get_grids(self, grid_ids, flat=True):
         """
-        time_step += self.config['start_timestep']
-        self[grid_id, time_step] = new_grid
+        """
+        grid_ids = self.find_grid_numbers(grid_ids)
+        # print(grid_ids)
+        if type(grid_ids) is list and \
+                not all([type(i) is int for i in grid_ids]):
+            grid_ids = self.convert_grid_numbers_to_index(grid_ids)
 
-    def set_grid_over_time(self, grid_id, start, stop, new_grids):
-        """Set a grid at a timestep
-         Parameters 
-        ----------
-        grid_id: int or str
-            if an int, it should be the grid number.
-            if a str, it should be a grid name.
-        time_step: int
-            time step to get grid at
-        new_grids: np.array like
-            Grids to set. shape must match grids being accessed. 
+        _filter = self.current_filter
+        _filter = self.filters[_filter].flatten() if _filter else 1
+        # print(self.grids[grid_ids])
+        grids = self.grids[grid_ids] * _filter
+
+        if flat:
+            if len(grids.shape) == 2:
+                return grids
+            else:
+                return grids.reshape(
+                    [grids.shape[0]* grids.shape[1], grids.shape[2]]
+                )
+
+        rows, cols = self.config['grid_shape']
+       
+        if len(grids.shape) == 2:
+            return grids.reshape([grids.shape[0], rows, cols])
+        else:
+            return grids.reshape([grids.shape[0]*grids.shape[1], rows, cols])
+
+    def get_subgrids(self, grid_id, index,  flat = True):
         """
-        if not start is None:
-            start += self.config['start_timestep']
-        if not stop is None:
-            stop += self.config['start_timestep']
-        self[grid_id, start:stop] = new_grids
+        """
+        if type(index) is tuple and len(index) == 2: ## 2 slices
+            index = slice(None,None), index[0], index[1]
+        elif type(index) is tuple and len(index) == 1: # 1 slices
+            index = slice(None,None), index[0]
+            # print(index)
+        else: ## index is array 
+            index = slice(None,None), index
+
+        subgrids = self.get_grids(grid_id, False)[index]
+        if flat:
+            if len(subgrids.shape) == 2:
+                return subgrids
+            n_grids, rows, cols = subgrids.shape
+            return subgrids.reshape([n_grids, rows * cols])
+            
+        return subgrids
+ 
+    def get_grids_by_id(self, grid_id, flat=True):
+        """
+        """
+        ## TODO add verification of id
+        return self.get_grids(grid_id, flat)
+
+
+    def get_subgrids_by_id(self, grid_id, index, flat=True):
+        ## TODO add verification of id
+        return self.get_grids(grid_id, index, flat)
+
+
+    def get_grids_at_timesteps(self, timesteps, flat=True):
+        """
+        """
+        ## TODO add verification of id
+        return self.get_grids(timesteps, flat)
+
+    def get_subgrids_at_timesteps(self, timesteps, index, flat=True):
+        """
+        """
+        ## TODO add verification of id
+        return self.get_subgrids(timesteps, index, flat)
+
+    def get_grids_at_timestep(self, timestep, flat = True):
+        """
+        """
+        ## TODO add verification of id
+        return self.get_grids(timestep, flat)
+
+    def get_subgrids_at_timestep(self, timestep, index,  flat = True):
+        ## TODO add verification of id
+        return self.get_subgrids(timestep, index, flat)
+
+    def set_grid(self, grid_id, value):
+        """Get a grid given grid id pair (timestep, grid_id)
+        """
+        
+        g_num = self.find_grid_number(grid_id)
+        if type(value) is np.ndarray:
+            self.grids[g_num] = value.flatten()
+        else:
+            self.grids[g_num] = value
+
+    def set_subgrid(self, grid_id, index,  value):
+        """Get a subgrid given grid id pair (timestep, grid_id), and index
+        """
+        ## filters carry over from get_grid
+        subgrid = self.set_grid(grid_id, False)[index]
+
+        if flat:
+            return subgrid.flatten() 
+        return subgrid
+
+    def set_grids(self, grid_ids, value):
+        """
+        """
+        grid_ids = self.find_grid_numbers(grid_ids)
+        # print(grid_ids)
+        if type(grid_ids) is list and \
+                not all([type(i) is int for i in grid_ids]):
+            grid_ids = self.convert_grid_numbers_to_index(grid_ids)
+
+        _filter = self.current_filter
+        _filter = self.filters[_filter].flatten() if _filter else 1
+        # print(self.grids[grid_ids])
+        grids = self.grids[grid_ids] * _filter
+
+        if flat:
+            if len(grids.shape) == 2:
+                return grids
+            else:
+                return grids.reshape(
+                    [grids.shape[0]* grids.shape[1], grids.shape[2]]
+                )
+
+        rows, cols = self.config['grid_shape']
+       
+        if len(grids.shape) == 2:
+            return grids.reshape([grids.shape[0], rows, cols])
+        else:
+            return grids.reshape([grids.shape[0]*grids.shape[1], rows, cols])
+
+    def set_subgrids(self, grid_id, index,  value):
+        """
+        """
+        if type(index) is tuple and len(index) == 2: ## 2 slices
+            index = slice(None,None), index[0], index[1]
+        elif type(index) is tuple and len(index) == 1: # 1 slices
+            index = slice(None,None), index[0]
+            # print(index)
+        else: ## index is array 
+            index = slice(None,None), index
+
+        subgrids = self.set_grids(grid_id, False)[index]
+        if flat:
+            if len(subgrids.shape) == 2:
+                return subgrids
+            n_grids, rows, cols = subgrids.shape
+            subgrids.reshape([n_grids, rows * cols])
+            
+
+ 
+    def set_grids_by_id(self, grid_id, value):
+        """
+        """
+        ## TODO add verification of id
+        self.set_grids(grid_id, value)
+
+
+    def set_subgrids_by_id(self, grid_id, index, value):
+        ## TODO add verification of id
+        self.set_grids(grid_id, index, value)
+
+
+    def set_grids_at_timesteps(self, timesteps, value):
+        """
+        """
+        ## TODO add verification of id
+        self.set_grids(timesteps, value)
+
+    def set_subgrids_at_timesteps(self, timesteps, index, value):
+        """
+        """
+        ## TODO add verification of id
+        self.get_subgrids(timesteps, index, value)
+
+    def set_grids_at_timestep(self, timestep, value):
+        """
+        """
+        ## TODO add verification of id
+        self.set_grids(timestep, value)
+
+    def set_subgrids_at_timestep(self, timestep, index, value):
+        ## TODO add verification of id
+        self.set_subgrids(timestep, index, value)
+
+
+
 
     def increment_time_step (self, carry_data_forward = True):
         """Increment time_step, for current_girds.
