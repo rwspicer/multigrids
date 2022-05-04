@@ -53,10 +53,87 @@ class TemporalMultiGrid (MultiGrid):
             self.num_timesteps = args[3]
             super(TemporalMultiGrid , self).__init__(*args, **kwargs)
             self.config['num_timesteps'] = self.num_timesteps
+            # self.config['num_grids'] = self.num_timesteps
             self.config['timestep'] = 0
             self.config['start_timestep'] = \
                 common.load_or_use_default(kwargs, 'start_timestep', 0)
+
         self.current_grids = self.grids[0]
+
+    def new(self, *args, **kwargs):
+        """Does setup for a new TemporalMultiGrid object
+        
+        Parameters
+        ----------
+        *args: list
+            see MultiGird docs
+        **kwargs: dict
+            see MultiGird docs and:
+                'start_timestep': int # to ues as the start timestep
+
+        Returns
+        -------
+        Config: dict
+            dict to be used as config attribute.
+        Grids: np.array like
+            array to be used as internal memory.
+        """
+        config = {}
+        start = common.load_or_use_default(kwargs, 'start_timestep', 0)
+        grid_names = common.load_or_use_default(
+            kwargs, 'grid_names', list(range(self.num_timesteps))
+        )
+        config['start_timestep'] = start
+        end = start + self.num_timesteps
+
+        grid_names = [(ts, gn) for ts in range(start, end) for gn in grid_names]
+        kwargs['grid_names'] = grid_names
+        
+
+        mg_config, grids = super().new(*args, **kwargs)
+        mg_config.update(config)
+        return mg_config, grids
+
+    def create_grid_name_map(self, grid_names, config):
+        """Creates a dictionary to map string grid names to their 
+        interger index values. Used to initialize gird_name_map
+        
+        Paramaters
+        ----------
+        grid_names: list of strings
+            List of grid names. Length == num_grids
+
+        Returns
+        -------
+        Dict:
+            String: int, key value pairs
+        """
+        # time        
+
+        gnm = {}
+        ts = 0
+        gn = 0
+        for key in grid_names:
+            gnm[key] = (ts, gn)
+            gn += 1
+            if gn >= config['num_grids']:
+                gn = 0
+                ts += 1
+
+
+        required_size = config['num_grids'] * self.num_timesteps
+        if len(gnm) > 0 and required_size != len(gnm):
+            raise common.GridSizeMismatchError( 'grid name size mismatch' )
+        
+        return gnm
+        # return {grid_names[i]: i for i in range(len(grid_names))}   
+
+    def grid_id_list(self):
+        id_list = set()
+        for key in self.config['grid_name_map']:
+            id_list.add(key[1])
+        return sorted(id_list)
+
 
     def find_memory_shape (self,config):
         """Construct the shape needed for multigrid in memory from 
