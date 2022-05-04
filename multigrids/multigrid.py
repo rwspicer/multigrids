@@ -26,7 +26,7 @@ from .__metadata__ import __version__
 from . import figures
 
 # from .common import common.load_or_use_default, GridSizeMismatchError
-import common
+from . import common
 
 class MultigridConfigError (Exception):
     """Raised if a multigrid class is missing its configuration"""
@@ -178,7 +178,31 @@ class MultiGrid (object):
             return str(self.grids.reshape(self.config['real_shape']))
         except AttributeError:
             return "object not initialized"
-        
+
+    def is_subgrids_key(self, key):
+        """
+        """
+        return type(key) is tuple and type(key[0]) in (list, range, slice)
+
+    def is_grids_key(self, key):
+        """
+        """
+        return not self.is_subgrids_key(key) and \
+                type(key) in [range, slice] or \
+                type(key) is tuple and \
+                not type(key[1]) in (np.ndarray, list, range, slice)
+    
+    def is_subgrid_key(self, key):
+        """
+        """
+        return not self.is_grids_key(key) and \
+                type(key) is tuple and len(key) > 1
+
+    def is_grid_key(self, key):
+        """
+        """
+        return not self.is_subgrid_key(key) and type(key) in (int, str)
+
     def __getitem__(self, key): 
         """Get item function
         
@@ -194,26 +218,26 @@ class MultiGrid (object):
             Grid from the multigrid with the shape self.config['grid_shape']
         
         """
-        if type(key) is tuple and type(key[0]) in (list, range, slice):
+        if self.is_subgrids_key(key):
             ## multiple subgrids
             nk = key[0]
             if type(nk) is slice:
                 nk = range(nk.start,nk.stop,(nk.step if nk.step else 1))
             grids = self.get_subgrids(nk, key[1:], False)
 
-        elif type(key) in [range, slice] or \
-                type(key) is tuple and \
-                not type(key[1]) in (np.ndarray, list, range, slice):
+        elif self.is_grids_key(key):
             ## multiple Grids
             if type(key) is slice:
                 key = range(key.start,key.stop,(key.step if key.step else 1))
             grids = self.get_grids(key, False) 
 
-        elif type(key) is tuple and len(key) > 1: ## single subgrid
+        elif self.is_subgrid_key(key): ## single subgrid
             grids = self.get_subgrid(key[0], key[1:], False)   
 
-        else:
+        elif self.is_grid_key(key):
             grids = self.get_grid(key, False)
+        else:
+            raise KeyError('Key type is not recognized:', key)
 
         return grids 
 
@@ -228,25 +252,26 @@ class MultiGrid (object):
         value: np.array like
             Grid that is set. Should have shape of self.config['grid_shape'].
         """
-        if type(key) is tuple and type(key[0]) in (list, range, slice):
+        if self.is_subgrids_key(key):
             ## multiple subgrids
             nk = key[0]
             if type(nk) is slice:
                 nk = range(nk.start,nk.stop,(nk.step if nk.step else 1))
             self.set_subgrids(nk, key[1:], value)
 
-        elif type(key) in [range, slice] or \
-             type(key) is tuple and not type(key[1]) in (np.ndarray, list, range, slice):
+        elif self.is_grids_key(key):
             ## multiple Grids
             if type(key) is slice:
                 key = range(key.start,key.stop,(key.step if key.step else 1))
             self.set_grids(key, value) 
 
-        elif type(key) is tuple and len(key) > 1: ## single subgrid
+        elif self.is_subgrid_key(key): ## single subgrid
             self.set_subgrid(key[0], key[1:], value)   
 
-        else:
+        elif self.is_grid_key(key):
             self.set_grid(key, value)
+        else:
+            raise KeyError('Key type is not recognized:', key)
 
     def __eq__(self, other):
         """Equality Operator for MultiGrid object 
@@ -318,12 +343,13 @@ class MultiGrid (object):
 
         grid_names = common.load_or_use_default(kwargs, 'grid_names', [])
         
-        if len(grid_names) > 0 and config['num_grids'] != len(grid_names):
-            raise common.GridSizeMismatchError( 'grid name size mismatch' )
-        config['grid_name_map'] = self.create_name_map(grid_names)
+            
+        config['grid_name_map'] = self.create_grid_name_map(grid_names, config)
             
 
-        config['filename'] = common.load_or_use_default(kwargs, 'filename', None)
+        config['filename'] = common.load_or_use_default(
+            kwargs, 'filename', None
+        )
         config['data_model'] = common.load_or_use_default(
             kwargs, 'data_model', 'memmap'
         )
@@ -370,7 +396,7 @@ class MultiGrid (object):
         return config, grids
 
     def save(self, file=None, grid_file_ext = '.grids.data'):
-        """Save MiltiGrid Object to metadata file and data file
+        """Save MultiGrid Object to metadata file and data file
         The metadata file cantinas the config info, and the data file
         contains the grids. 
 
@@ -490,7 +516,7 @@ class MultiGrid (object):
             )
         self._is_temp = False
 
-    def create_name_map(self, grid_names):
+    def create_grid_name_map(self, grid_names, config):
         """Creates a dictionary to map string grid names to their 
         interger index values. Used to initialize gird_name_map
         
@@ -504,6 +530,8 @@ class MultiGrid (object):
         Dict:
             String: int, key value pairs
         """
+        if len(grid_names) > 0 and config['num_grids'] != len(grid_names):
+            raise common.GridSizeMismatchError( 'grid name size mismatch' )
         return {grid_names[i]: i for i in range(len(grid_names))}   
 
     def add_filter(self, name, data, force=False):
