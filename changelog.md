@@ -1,6 +1,25 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2022-05-06
+### Added
+- Start of new testing suite via jupyter notebooks
+- deactivate filter function
+- tools for loading data from series of binary files added to tools.py
+- tools for sub-setting data
+- tools for merging data set(expermintal)
+
+### Changed
+- Updated All __getitem__, __setitem__ and supporting get_* and set_* functions
+- many functions rewritten or renamed 
+- many functions moved
+- renamed all functions that started with get or set that do not aceess data
+  to start with somtinh else
+- better memory management methods are used in Creation and saving
+- default save file names
+- changed how masks are saved/loaded
+
+
 ## [0.6.2] - 2021-02-08
 ### Added
 - Multigrid.clip_polygon_raster that clips to a shape in a vector file
