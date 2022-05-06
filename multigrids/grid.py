@@ -62,7 +62,7 @@ class Grid (MultiGrid):
         except KeyError:
             pass
     
-    def find_memory_shape (self, config):
+    def create_memory_shape (self, config):
         """Construct the shape needed for multigrid in memory from 
         configuration. 
 
@@ -79,7 +79,7 @@ class Grid (MultiGrid):
             config['grid_shape'][0] * config['grid_shape'][1]
         )
     
-    def find_real_shape (self, config):
+    def create_real_shape (self, config):
         """Construct the shape that represents the shape of the Grid.
 
         Parameters

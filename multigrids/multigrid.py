@@ -324,8 +324,8 @@ class MultiGrid (object):
         config = {}
         config['grid_shape']= (args[0], args[1])
         config['num_grids'] = args[2]
-        config['memory_shape'] = self.find_memory_shape(config)
-        config['real_shape'] = self.find_real_shape(config)
+        config['memory_shape'] = self.create_memory_shape(config)
+        config['real_shape'] = self.create_real_shape(config)
         config['data_type'] = common.load_or_use_default(
             kwargs, 'data_type', 'float32'
         )
@@ -386,8 +386,8 @@ class MultiGrid (object):
         with open(file) as conf_text:
             config = yaml.load(conf_text, Loader=yaml.Loader)
         config['cfg_path'] = os.path.split(file)[0]
-        config['memory_shape'] = self.find_memory_shape(config)
-        config['real_shape'] = self.find_real_shape(config)
+        config['memory_shape'] = self.create_memory_shape(config)
+        config['real_shape'] = self.create_real_shape(config)
         grids = self.setup_internal_memory(config)
 
         if type(config['mask']) is str and os.path.isfile(config['mask']):
@@ -617,7 +617,7 @@ class MultiGrid (object):
             grids = np.zeros(config['memory_shape'])
         return grids 
     
-    def find_memory_shape (self, config):
+    def create_memory_shape (self, config):
         """Construct the shape needed for multigrid in memory from 
         configuration. 
 
@@ -634,7 +634,7 @@ class MultiGrid (object):
         return (config['num_grids'], 
             config['grid_shape'][0] * config['grid_shape'][1])
         
-    def find_real_shape (self, config):
+    def create_real_shape (self, config):
         """Construct the shape that represents the real shape of the 
         data for the MultiGird.
 
@@ -651,7 +651,7 @@ class MultiGrid (object):
         return (config['num_grids'], 
             config['grid_shape'][0], config['grid_shape'][1])
 
-    def find_grid_number(self, grid_id):
+    def lookup_grid_number(self, grid_id):
         """Get the Grid number for a grid id
         
         Parameters
@@ -668,7 +668,7 @@ class MultiGrid (object):
         return grid_id if type(grid_id) is int \
                        else self.config['grid_name_map'][grid_id]
     
-    def find_grid_slice(self, start = None, end = None, step = None):
+    def lookup_grid_slice(self, start = None, end = None, step = None):
         """Get grid id slice from multigrid keys
 
         parameters
@@ -684,13 +684,13 @@ class MultiGrid (object):
         -------
         slice
         """
-        start = self.find_grid_number(start) if start else None
-        end = self.find_grid_number(end) if end else None
+        start = self.lookup_grid_number(start) if start else None
+        end = self.lookup_grid_number(end) if end else None
         step = step if step else 1
 
         return slice(start, end, step)
 
-    def find_grid_range(self, start = None, end = None, step = 1):
+    def lookup_grid_range(self, start = None, end = None, step = 1):
         """Get grid id range from multigrid keys
 
         parameters
@@ -706,13 +706,13 @@ class MultiGrid (object):
         -------
         slice
         """
-        start = self.find_grid_number(start) if start else 0
-        end = self.find_grid_number(end) if end else len(self.grids)
+        start = self.lookup_grid_number(start) if start else 0
+        end = self.lookup_grid_number(end) if end else len(self.grids)
         step = step if step else 1
   
         return range(start, end, step)      
 
-    def find_grid_numbers(self, grid_ids):
+    def lookup_grid_numbers(self, grid_ids):
         """Find the grid numbers for a list, range or slice of grid_ids
 
         Parameters
@@ -726,9 +726,9 @@ class MultiGrid (object):
             Grid numbers for ids
         """
         if not type(grid_ids) in [slice, range]:
-            grid_ids = [self.find_grid_number(gid) for gid in grid_ids]
+            grid_ids = [self.lookup_grid_number(gid) for gid in grid_ids]
         else:
-            grid_ids = self.find_grid_range(
+            grid_ids = self.lookup_grid_range(
                 grid_ids.start, grid_ids.stop, grid_ids.step
             )  
         return grid_ids
@@ -750,7 +750,7 @@ class MultiGrid (object):
             1d if flat, 2d otherwise.
             Filter is applied if `set_filter` has been called
         """
-        grid_id = self.find_grid_number(grid_id)
+        grid_id = self.lookup_grid_number(grid_id)
 
         _filter = self.current_filter
         _filter = self.filters[_filter].flatten() if _filter else 1
@@ -801,7 +801,7 @@ class MultiGrid (object):
             2d if flat, 3d otherwise.
             Filter is applied if `set_filter` has been called
         """
-        grid_ids = self.find_grid_numbers(grid_ids)
+        grid_ids = self.lookup_grid_numbers(grid_ids)
 
         _filter = self.current_filter
         _filter = self.filters[_filter].flatten() if _filter else 1
@@ -858,7 +858,7 @@ class MultiGrid (object):
         new_grid: np.array like, or number
             Grid to set. must be able to reshape to grid_shape.
         """
-        grid_id = self.find_grid_number(grid_id)
+        grid_id = self.lookup_grid_number(grid_id)
 
         try:
             self.grids[grid_id] = new_grid.flatten()
@@ -878,7 +878,7 @@ class MultiGrid (object):
         new_gird: 
             values that can be broadcast in to shape of index
         """
-        grid_id = self.find_grid_number(grid_id)
+        grid_id = self.lookup_grid_number(grid_id)
 
         self.grids[grid_id].reshape(self.config['grid_shape'])[index] = new_grid
         
@@ -894,7 +894,7 @@ class MultiGrid (object):
             then there is a single grid to set for all keys provided
             otherwise there is a new grid for each
         """
-        grid_ids = self.find_grid_numbers(grid_ids)
+        grid_ids = self.lookup_grid_numbers(grid_ids)
 
         shape =  self.config['grid_shape']
     
@@ -922,7 +922,7 @@ class MultiGrid (object):
             then there is a single grid to set for all keys provided
             otherwise there is a new grid for each
         """
-        grid_ids = self.find_grid_numbers(grid_ids)
+        grid_ids = self.lookup_grid_numbers(grid_ids)
 
         shape = self.config['grid_shape']
         sub_shape = self.grids[0].reshape(shape)[index].shape

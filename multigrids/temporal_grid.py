@@ -90,7 +90,7 @@ class TemporalGrid (MultiGrid):
         mg_config.update(config)
         return mg_config, grids
 
-    def find_grid_number(self, grid_id):
+    def lookup_grid_number(self, grid_id):
         """Get the Grid number for a grid id
         
         Parameters
@@ -112,9 +112,9 @@ class TemporalGrid (MultiGrid):
             else:
                 raise IndexError('start_timestep <= timestep <= end_timestep')
         
-        return super().find_grid_number(grid_id)
+        return super().lookup_grid_number(grid_id)
 
-    def find_memory_shape (self,config):
+    def create_memory_shape (self,config):
         """ Construct the shape needed for multigrid in memory from 
         configuration. 
 
@@ -133,7 +133,7 @@ class TemporalGrid (MultiGrid):
             config['grid_shape'][0] * config['grid_shape'][1]
         )
 
-    def find_real_shape (self, config):
+    def create_real_shape (self, config):
         """Construct the shape that represents the real shape of the 
         data for the MultiGird.
 
@@ -174,7 +174,7 @@ class TemporalGrid (MultiGrid):
         
         return self.current_timestep()
     
-    def get_range(self):
+    def timestep_range(self):
         """get the range of time steps"""
         return range(
             self.config['start_timestep'], 

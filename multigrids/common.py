@@ -37,3 +37,24 @@ def open_or_create_memmap_grid(filename, mode, dtype, shape):
         grids = np.memmap(filename, dtype=dtype, mode='w+', shape=shape)           
         del(grids)
     return np.memmap(filename, dtype=dtype, mode=mode, shape=shape)
+
+
+def format_subgrid_index(index):
+    """
+    """
+    if type(index) is tuple and len(index) == 2: ## 2 slices
+        index =  slice(None), index[0], index[1]
+    elif type(index) is tuple and len(index) == 1: # 1 slices
+        index = slice(None),index[0],slice(None)
+    elif type(index) is slice:
+        index = slice(None), index, slice(None)
+    else: ## index is array 
+        index = slice(None,None), index
+    return index
+
+
+class InvalidGridIDError (Exception):
+    """Raised if grid timestep not found"""
+
+class InvalidTimeStepError (Exception):
+    """Raised if timestep is out of range"""
