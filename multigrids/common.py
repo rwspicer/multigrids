@@ -38,7 +38,6 @@ def open_or_create_memmap_grid(filename, mode, dtype, shape):
         del(grids)
     return np.memmap(filename, dtype=dtype, mode=mode, shape=shape)
 
-
 def format_subgrid_index(index):
     """
     """
@@ -51,7 +50,6 @@ def format_subgrid_index(index):
     else: ## index is array 
         index = slice(None,None), index
     return index
-
 
 class InvalidGridIDError (Exception):
     """Raised if grid timestep not found"""

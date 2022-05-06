@@ -37,7 +37,6 @@ class TemporalGrid (MultiGrid):
     grids: TemporalMultiGrid data, np.memmap or np.ndarray  
     current_grids: grids at the current timestep
     """
-    
     def __init__ (self, *args, **kwargs):
         """ Class initializer """
 
@@ -90,30 +89,6 @@ class TemporalGrid (MultiGrid):
         mg_config.update(config)
         return mg_config, grids
 
-    def lookup_grid_number(self, grid_id):
-        """Get the Grid number for a grid id
-        
-        Parameters
-        ----------
-        grid_id: int or str
-            if an int, it should be the grid number.
-            if a str, it should be a grid name.
-
-        Returns
-        -------
-        int
-            gird id
-        """
-        if type(grid_id) is int:
-            start = self.config['start_timestep']
-            end =  start + self.config['num_timesteps']
-            if start <= grid_id <= end:
-                return grid_id - start
-            else:
-                raise IndexError('start_timestep <= timestep <= end_timestep')
-        
-        return super().lookup_grid_number(grid_id)
-
     def create_memory_shape (self,config):
         """ Construct the shape needed for multigrid in memory from 
         configuration. 
@@ -152,6 +127,30 @@ class TemporalGrid (MultiGrid):
             config['grid_shape'][0] , config['grid_shape'][1]
         )
 
+    def lookup_grid_number(self, grid_id):
+        """Get the Grid number for a grid id
+        
+        Parameters
+        ----------
+        grid_id: int or str
+            if an int, it should be the grid number.
+            if a str, it should be a grid name.
+
+        Returns
+        -------
+        int
+            gird id
+        """
+        if type(grid_id) is int:
+            start = self.config['start_timestep']
+            end =  start + self.config['num_timesteps']
+            if start <= grid_id <= end:
+                return grid_id - start
+            else:
+                raise IndexError('start_timestep <= timestep <= end_timestep')
+        
+        return super().lookup_grid_number(grid_id)
+    
     def increment_time_step (self):
         """increment time_step, 
         
@@ -181,7 +180,6 @@ class TemporalGrid (MultiGrid):
             self.config['start_timestep'] + self.config['num_timesteps']
         )
     
-
     def save_clip(self, filename, clip_func=clip.default, clip_args={}):
         """
         """

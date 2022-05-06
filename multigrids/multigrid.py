@@ -37,7 +37,63 @@ class MultigridIOError (Exception):
 class MultigridFilterError (Exception):
     """Raised during multigrid Filter ops"""
 
-    
+def is_subgrids_key(self, key):
+    """Test if key is subgrids key
+
+    Parameters
+    ----------
+    key: any
+
+    Returns
+    -------
+    Bool
+    """
+    return type(key) is tuple and type(key[0]) in (list, range, slice)
+
+def is_grids_key(self, key):
+    """Test if key is grids key
+
+    Parameters
+    ----------
+    key: any
+
+    Returns
+    -------
+    Bool
+    """
+    return not self.is_subgrids_key(key) and \
+            type(key) in [range, slice] or \
+            type(key) is tuple and \
+            not type(key[1]) in (np.ndarray, list, range, slice)
+
+def is_subgrid_key(self, key):
+    """Test if key is subgrid key
+
+    Parameters
+    ----------
+    key: any
+
+    Returns
+    -------
+    Bool
+    """
+    return not self.is_grids_key(key) and \
+            type(key) is tuple and len(key) > 1
+
+def is_grid_key(self, key):
+    """Test if key is grid key
+
+    Parameters
+    ----------
+    key: any
+
+    Returns
+    -------
+    Bool
+    """
+    return not self.is_subgrid_key(key) and type(key) in (int, str)
+
+
 class MultiGrid (object):
     """
     A class to represent a set of multiple related grids of the same 
@@ -87,7 +143,6 @@ class MultiGrid (object):
         dictionary of flites that may be applied to data when accessing
     
     """
-
     def __init__ (self, *args, **kwargs):
         """ Class initializer """
         # print('init')
@@ -148,7 +203,6 @@ class MultiGrid (object):
         # except KeyError:
         #     pass # no raster meta is a ok
 
-
     def __del__ (self):
         """deconstructor for class"""
         if hasattr(self, 'config'):
@@ -165,7 +219,6 @@ class MultiGrid (object):
         if self._is_temp and not loc is None and os.path.exists(loc):
             os.remove(loc)
 
-        
     def __repr__ (self):
         """Get string representation of object
         
@@ -178,30 +231,6 @@ class MultiGrid (object):
             return str(self.grids.reshape(self.config['real_shape']))
         except AttributeError:
             return "object not initialized"
-
-    def is_subgrids_key(self, key):
-        """
-        """
-        return type(key) is tuple and type(key[0]) in (list, range, slice)
-
-    def is_grids_key(self, key):
-        """
-        """
-        return not self.is_subgrids_key(key) and \
-                type(key) in [range, slice] or \
-                type(key) is tuple and \
-                not type(key[1]) in (np.ndarray, list, range, slice)
-    
-    def is_subgrid_key(self, key):
-        """
-        """
-        return not self.is_grids_key(key) and \
-                type(key) is tuple and len(key) > 1
-
-    def is_grid_key(self, key):
-        """
-        """
-        return not self.is_subgrid_key(key) and type(key) in (int, str)
 
     def __getitem__(self, key): 
         """Get item function
@@ -218,23 +247,23 @@ class MultiGrid (object):
             Grid from the multigrid with the shape self.config['grid_shape']
         
         """
-        if self.is_subgrids_key(key):
+        if is_subgrids_key(key):
             ## multiple subgrids
             nk = key[0]
             if type(nk) is slice:
                 nk = range(nk.start,nk.stop,(nk.step if nk.step else 1))
             grids = self.get_subgrids(nk, key[1:], False)
 
-        elif self.is_grids_key(key):
+        elif is_grids_key(key):
             ## multiple Grids
             if type(key) is slice:
                 key = range(key.start,key.stop,(key.step if key.step else 1))
             grids = self.get_grids(key, False) 
 
-        elif self.is_subgrid_key(key): ## single subgrid
+        elif is_subgrid_key(key): ## single subgrid
             grids = self.get_subgrid(key[0], key[1:], False)   
 
-        elif self.is_grid_key(key):
+        elif is_grid_key(key):
             grids = self.get_grid(key, False)
         else:
             raise KeyError('Key type is not recognized:', key)
@@ -252,23 +281,23 @@ class MultiGrid (object):
         value: np.array like
             Grid that is set. Should have shape of self.config['grid_shape'].
         """
-        if self.is_subgrids_key(key):
+        if is_subgrids_key(key):
             ## multiple subgrids
             nk = key[0]
             if type(nk) is slice:
                 nk = range(nk.start,nk.stop,(nk.step if nk.step else 1))
             self.set_subgrids(nk, key[1:], value)
 
-        elif self.is_grids_key(key):
+        elif is_grids_key(key):
             ## multiple Grids
             if type(key) is slice:
                 key = range(key.start,key.stop,(key.step if key.step else 1))
             self.set_grids(key, value) 
 
-        elif self.is_subgrid_key(key): ## single subgrid
+        elif is_subgrid_key(key): ## single subgrid
             self.set_subgrid(key[0], key[1:], value)   
 
-        elif self.is_grid_key(key):
+        elif is_grid_key(key):
             self.set_grid(key, value)
         else:
             raise KeyError('Key type is not recognized:', key)
@@ -534,52 +563,6 @@ class MultiGrid (object):
             raise common.GridSizeMismatchError( 'grid name size mismatch' )
         return {grid_names[i]: i for i in range(len(grid_names))}   
 
-    def add_filter(self, name, data, force=False):
-        """add a filter to the data set
-
-        Parameters
-        ----------
-        name: str
-            name used to set/ access fileter
-        data: np.array 
-            filter of shape config['grid_shape'] is used as multiplier 
-            by getter functions with filters is set via set_filter() call
-        force: bool,  default False
-            if True existing fliters named `name` are overwritten
-
-        Raises
-        ------
-        MultigridFilterError:
-            Raised if filter by `name` exists and force is false or if 
-            shape of `data` is note equal to `grid_shape`
-        """
-        if name in self.filters and force == False:
-            raise MultigridFilterError("filters contains %s filter" % name)
-
-        if data.shape != self.config['grid_shape']:
-            raise MultigridFilterError("filter shape does not match grid shape")
-    
-        self.filters[name] = data
-
-    def set_filter(self, name):
-        """set a filter 
-
-        Parameters
-        ----------
-        name: str or None
-            if None: filters are unset
-            else: filter is set based on name
-        
-        Raises
-        ------
-        MultigridFilterError
-            When the filter name is invalid
-        """
-        if name in self.filters or name is None:
-            self.current_filter = name
-        else:
-            raise MultigridFilterError("invalid filter: %s" % name)
-
     def setup_internal_memory(self, config):
         """Setup the internal memory representation of grids
 
@@ -651,6 +634,57 @@ class MultiGrid (object):
         return (config['num_grids'], 
             config['grid_shape'][0], config['grid_shape'][1])
 
+    def add_filter(self, name, data, force=False):
+        """add a filter to the data set
+
+        Parameters
+        ----------
+        name: str
+            name used to set/ access fileter
+        data: np.array 
+            filter of shape config['grid_shape'] is used as multiplier 
+            by getter functions with filters is set via set_filter() call
+        force: bool,  default False
+            if True existing fliters named `name` are overwritten
+
+        Raises
+        ------
+        MultigridFilterError:
+            Raised if filter by `name` exists and force is false or if 
+            shape of `data` is note equal to `grid_shape`
+        """
+        if name in self.filters and force == False:
+            raise MultigridFilterError("filters contains %s filter" % name)
+
+        if data.shape != self.config['grid_shape']:
+            raise MultigridFilterError("filter shape does not match grid shape")
+    
+        self.filters[name] = data
+
+    def activate_filter(self, name):
+        """set a filter 
+
+        Parameters
+        ----------
+        name: str or None
+            if None: filters are unset
+            else: filter is set based on name
+        
+        Raises
+        ------
+        MultigridFilterError
+            When the filter name is invalid
+        """
+        if name in self.filters or name is None:
+            self.current_filter = name
+        else:
+            raise MultigridFilterError("invalid filter: %s" % name)
+    
+    def deactivate_filter(self):
+        """set cuttent_filter to None
+        """
+        self.current_filter = None
+        
     def lookup_grid_number(self, grid_id):
         """Get the Grid number for a grid id
         
@@ -966,8 +1000,7 @@ class MultiGrid (object):
         fig = figure_func(data, figure_args)
         plt.show()
         plt.close()
-
-        
+   
     def save_all_figures(
             self, dirname, figure_func=figures.default, figure_args={}, extension='.png'
         ):
@@ -984,7 +1017,6 @@ class MultiGrid (object):
             )
             figure_args['title'] = self.config["dataset_name"].replace('-', ' ')  + ' ' + str(grid)
             self.save_figure(grid, filename, figure_func, figure_args)
-
 
     def save_as_geotiff(self, filename, grid_id, **kwargs):
         """save a grid as a tiff file
@@ -1284,8 +1316,6 @@ class MultiGrid (object):
         os.rmdir(temp_dir)
         return rv 
         
-
-
     def zoom_to(
             self, location, radius=50, location_format="ROWCOL", verbose=False
         ):
