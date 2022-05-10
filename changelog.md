@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - 2022-05-10
+### Fixes
+- bugs in functions that had been removed from MultiGrid class to detrmine key
+type by removing trefeneces to self
+
+### Removes
+- tools-bad.py. Which should not have been commited in the first place
+
 ## [0.7.0] - 2022-05-06
 ### Added
 - Start of new testing suite via jupyter notebooks

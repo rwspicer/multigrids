@@ -37,7 +37,7 @@ class MultigridIOError (Exception):
 class MultigridFilterError (Exception):
     """Raised during multigrid Filter ops"""
 
-def is_subgrids_key(self, key):
+def is_subgrids_key(key):
     """Test if key is subgrids key
 
     Parameters
@@ -50,7 +50,7 @@ def is_subgrids_key(self, key):
     """
     return type(key) is tuple and type(key[0]) in (list, range, slice)
 
-def is_grids_key(self, key):
+def is_grids_key(key):
     """Test if key is grids key
 
     Parameters
@@ -61,12 +61,12 @@ def is_grids_key(self, key):
     -------
     Bool
     """
-    return not self.is_subgrids_key(key) and \
+    return not is_subgrids_key(key) and \
             type(key) in [range, slice] or \
             type(key) is tuple and \
             not type(key[1]) in (np.ndarray, list, range, slice)
 
-def is_subgrid_key(self, key):
+def is_subgrid_key(key):
     """Test if key is subgrid key
 
     Parameters
@@ -77,10 +77,10 @@ def is_subgrid_key(self, key):
     -------
     Bool
     """
-    return not self.is_grids_key(key) and \
+    return not is_grids_key(key) and \
             type(key) is tuple and len(key) > 1
 
-def is_grid_key(self, key):
+def is_grid_key(key):
     """Test if key is grid key
 
     Parameters
@@ -91,7 +91,7 @@ def is_grid_key(self, key):
     -------
     Bool
     """
-    return not self.is_subgrid_key(key) and type(key) in (int, str)
+    return not is_subgrid_key(key) and type(key) in (int, str)
 
 
 class MultiGrid (object):
