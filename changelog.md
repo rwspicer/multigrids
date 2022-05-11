@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.7.2] - 2022-05-10
+### fixes 
+- bug were loading multigrid data/filters/mask puts file in wrong location
+
+### Added
+- Multigrid Classes have attributes to track mask and filter files if they 
+exist
+
 ## [0.7.1] - 2022-05-10
 ### Fixes
 - bugs in functions that had been removed from MultiGrid class to detrmine key

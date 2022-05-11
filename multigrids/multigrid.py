@@ -147,6 +147,8 @@ class MultiGrid (object):
         """ Class initializer """
         # print('init')
         self._is_temp = False
+        self.mask_file = None
+        self.filter_file = None
 
         if type(args[0]) is int:
             init_func = self.new
@@ -167,6 +169,7 @@ class MultiGrid (object):
                 mg_path,name = os.path.split(args[0])
                 name = name[:-4]
                 filter_file = os.path.join(mg_path, name + '.filters.data')
+                self.filter_file = filter_file
                 # print(filter_file)
                 n = len(self.config['filters'])
                 rows, cols = self.config['grid_shape']
@@ -414,13 +417,27 @@ class MultiGrid (object):
         """
         with open(file) as conf_text:
             config = yaml.load(conf_text, Loader=yaml.Loader)
-        config['cfg_path'] = os.path.split(file)[0]
+        cfg_path = os.path.split(file)[0]
+
+        if os.path.split(config['filename'])[0] != cfg_path:
+            config['filename'] = os.path.join(cfg_path, config['filename'])
+        if type(config['mask']) is str and \
+                os.path.split(config['mask'])[0] != cfg_path:
+            config['mask'] = os.path.join(cfg_path, config['mask'])  
+
+        if type(config['filters']) is str and \
+                os.path.split(config['filters'])[0] != cfg_path:
+            config['filters'] = os.path.join(cfg_path, config['filters'])  
+        
+
         config['memory_shape'] = self.create_memory_shape(config)
         config['real_shape'] = self.create_real_shape(config)
         grids = self.setup_internal_memory(config)
 
         if type(config['mask']) is str and os.path.isfile(config['mask']):
+            self.mask_file = config['mask']
             config['mask'] = np.load(config['mask'])
+            
 
         return config, grids
 
@@ -487,6 +504,8 @@ class MultiGrid (object):
             else:
                 filter_file = filter_file.split('.')[0] + '.filters.data'
             filter_file = os.path.join(path,filter_file)
+            self.filter_file = filter_file 
+            
 
             n = len(self.filters)
             rows, cols = self.config['grid_shape']
@@ -518,11 +537,12 @@ class MultiGrid (object):
                 mask_file = '.' + mask_file[1:].split('.')[0] + '.mask.data'
             else:
                 mask_file = mask_file.split('.')[0] + '.mask.data'
-            mask_file = os.path.join(path,mask_file)
+            mask_file = os.path.join(path, mask_file)
+            self.mask_file = mask_file
 
             np.save(mask_file, self.config['mask'])
             os.rename(mask_file + '.npy', mask_file)
-            s_config['mask'] = mask_file
+            s_config['mask'] = os.path.split(mask_file)[-1]
 
         with open(file, 'w') as sfile:
             sfile.write('#Saved ' + self.__class__.__name__ + " metadata\n")
@@ -583,6 +603,7 @@ class MultiGrid (object):
         grids: np.array or np.memmap
         """
         filename = config['filename']
+
         if config['data_model'] == 'memmap':
             if filename is None:
                 filename = os.path.join(mkdtemp(), 'temp.dat')
