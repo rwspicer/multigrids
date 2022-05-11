@@ -500,7 +500,8 @@ class MultiGrid (object):
                 path, filter_file = './', file
 
             if filter_file[0] == '.':
-                filter_file = '.' + filter_file[1:].split('.')[0] + '.filters.data'
+                filter_file = \
+                    '.' + filter_file[1:].split('.')[0] + '.filters.data'
             else:
                 filter_file = filter_file.split('.')[0] + '.filters.data'
             filter_file = os.path.join(path,filter_file)
@@ -551,7 +552,9 @@ class MultiGrid (object):
         ## if were saving a memmap make sure the new mg object is pointing
         ## to the right file
         if hasattr(self.grids, 'filename') and \
-                self.grids.filename != s_config['filename']:
+                self.grids.filename != s_config['filename'] and \
+                self._is_temp:
+            # print(self.grids.filename, s_config['filename'])
             path = os.path.split(file)[0]
             shape = self.grids.shape
             to_remove_filename = self.grids.filename

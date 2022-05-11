@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.7.3] - 2022-05-11
+### fixes
+- issues with saving existing grids to update metadata
+
 ## [0.7.2] - 2022-05-10
 ### fixes 
 - bug were loading multigrid data/filters/mask puts file in wrong location
