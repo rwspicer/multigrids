@@ -1,14 +1,9 @@
-
+"""
+Common
+"""
 
 import numpy as np
 import os
-
-class GridSizeMismatchError(Exception):
-    """GridSizeMismatchError"""
-    pass
-
-class IncrementTimeStepError (Exception):
-    """Raised if grid timestep not found"""
 
 load_or_use_default = lambda c, k, d: c[k] if k in c else d
 
@@ -51,8 +46,4 @@ def format_subgrid_index(index):
         index = slice(None,None), index
     return index
 
-class InvalidGridIDError (Exception):
-    """Raised if grid timestep not found"""
 
-class InvalidTimeStepError (Exception):
-    """Raised if timestep is out of range"""

@@ -20,12 +20,7 @@ from . import grid
 from . import temporal_grid
 from . import temporal
 
-
-class MultigridCreationError (Exception):
-    """Raised if multigrid creation fails"""
-
-class LoadDataMethodError (Exception):
-    """Raised when method is not passed to load_and_create"""
+from . import errors
 
 def create(data, 
         name="", description = "", mode='r+', 
@@ -89,7 +84,7 @@ def create(data,
         GridClass = temporal.TemporalMultiGrid
         args = (data.shape[2], data.shape[3], data.shape[1], data.shape[0])
     else:
-        raise MultigridCreationError(
+        raise errors.MultigridCreationError(
             "Cannot determine Which MultiGrid type to use from data"
         )
     # print(grid)

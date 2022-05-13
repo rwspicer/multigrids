@@ -4,16 +4,19 @@ Temporal Multigrid
 
 a class for multivariable grided temporal data
 """
-from time import time
+# from time import time      
 from .multigrid import MultiGrid
 import numpy as np
 import yaml
 import os
 
-from . import common, figures
+from . import common, figures, errors
 import matplotlib.pyplot as plt
 
 from . import clip
+
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
 class TemporalMultiGrid (MultiGrid):
     """ A class to represent a set of multiple related grids of the same 
@@ -82,49 +85,76 @@ class TemporalMultiGrid (MultiGrid):
         """
         config = {}
         start = common.load_or_use_default(kwargs, 'start_timestep', 0)
-        grid_names = common.load_or_use_default(
-            kwargs, 'grid_names', list(range(self.num_timesteps))
-        )
+        # grid_names = common.load_or_use_default(
+        #     kwargs, 'grid_names', list(range(self.num_timesteps))
+        # )
         config['start_timestep'] = start
-        end = start + self.num_timesteps
+        # end = start + self.num_timesteps
 
-        grid_names = [(ts, gn) for ts in range(start, end) for gn in grid_names]
-        kwargs['grid_names'] = grid_names
+        # grid_names = [(ts, gn) for ts in range(start, end) for gn in grid_names]
+        # kwargs['grid_names'] = grid_names
         
 
         mg_config, grids = super().new(*args, **kwargs)
         mg_config.update(config)
         return mg_config, grids
 
-    def create_grid_name_map(self, grid_names, config):
-        """Creates a dictionary to map string grid names to their 
-        interger index values. Used to initialize gird_name_map
+    def configure_grid_name_map(self, config):
+        """Configures the grid name map and sets in in config
         
         Paramaters
         ----------
-        grid_names: list of strings
-            List of grid names. Length == num_grids
-
-        Returns
-        -------
-        Dict:
-            String: int, key value pairs
+        config:
+            dict containing delta_timestep which is a string, a relativedelta,
+            or a dict with 'units' a string and 'delta' an int
         """
-        gnm = {}
-        ts = 0
-        gn = 0
-        for key in grid_names:
-            gnm[key] = (ts, gn)
-            gn += 1
-            if gn >= config['num_grids']:
-                gn = 0
-                ts += 1
+        grid_names = common.load_or_use_default(config, 'grid_names', [])
 
-        required_size = config['num_grids'] * self.num_timesteps
-        if len(gnm) > 0 and required_size != len(gnm):
-            raise common.GridSizeMismatchError( 'grid name size mismatch' )
+        try:
+            delta_timestep = config['delta_timestep']
+        except KeyError:
+            #assume year based
+            delta_timestep = 'year'
+
+        if type(delta_timestep) is str:
+            units = delta_timestep
+            delta_timestep = 1
+        elif type(delta_timestep) is dict:
+            units = delta_timestep['units'].lower()
+            delta_timestep = delta_timestep['delta'].lower()
+
+        if type(delta_timestep) is int:
+            deltas = {
+                "year":relativedelta(years=delta_timestep),
+                "month":relativedelta(months=delta_timestep),
+                "day":relativedelta(days=delta_timestep),
+            }
+            delta_timestep = deltas[units] if units else None
         
-        return gnm
+        if not type(delta_timestep) is relativedelta:
+            raise errors.GridNameMapConfigurationError(
+                'Delta Timestep could not be inferred'
+            )
+    
+        sts = self.config['start_timestep'] 
+        # sts = config['start_timestep']
+        if type(sts) is int and units == 'year':
+            delta_timestep = 1
+        nts = self.num_timesteps
+
+        gnm = {}
+        for n in range(nts):
+            ts = sts + n * delta_timestep
+            for gn, name in enumerate(grid_names):
+                gnm[(ts, name)] = (n, gn)
+
+        required_size = self.config['num_grids'] * nts
+        if len(gnm) > 0 and required_size != len(gnm):
+            raise errors.GridSizeMismatchError( 'grid name size mismatch' )
+
+        self.config['delta_timestep'] = delta_timestep
+        
+        self.config['grid_name_map'] = gnm
 
     def grid_id_list(self):
         """Lookup list of grids ids
@@ -149,7 +179,8 @@ class TemporalMultiGrid (MultiGrid):
         """
         return range(
             self.config['start_timestep'], 
-            self.config['start_timestep'] + self.config['num_timesteps']
+            self.config['start_timestep'] + self.config['num_timesteps'] * \
+                self.config['delta_timesteep']
         )
 
     def create_memory_shape (self,config):
@@ -207,10 +238,10 @@ class TemporalMultiGrid (MultiGrid):
         timesteps = None
         grids = None
 
-        if type(key) in [range, slice, list, set, int, str]: ## slice, list, or single timestep
+        if type(key) in [range, slice, list, set, int, str, datetime]: ## slice, list, or single timestep
             key = [key]
         
-        if len(key) > 4 and not all([type(i) in [int, str] for i in key]):
+        if len(key) > 4 and not all([type(i) in [int, str, datetime] for i in key]):
             
             raise IndexError ( 'Index has too many dimensions' )
 
@@ -282,10 +313,10 @@ class TemporalMultiGrid (MultiGrid):
         grids = None
 
         ## slice, list, or single timestep
-        if type(key) in [range, slice, list, set, int, str]: 
+        if type(key) in [range, slice, list, set, int, str , datetime]: 
             key = [key]
         
-        if len(key) > 4 and not all([type(i) in [int, str] for i in key]):
+        if len(key) > 4 and not all([type(i) in [int, str, datetime] for i in key]):
             raise IndexError ( 'Index has too many dimensions' )
 
         if 3 <= len(key) <=4:
@@ -348,6 +379,18 @@ class TemporalMultiGrid (MultiGrid):
         int
             gird id
         """
+        if type(grid_id) is str:
+            # date, time grid_id.split('T') ## add times
+            fields = grid_id.split('-')
+            if  len(fields) > 1:
+                year = int(fields[0])
+                month = int(fields[1]) if len(fields) > 1 else 1
+                day = int(fields[2]) if len(fields) > 2 else 1
+            
+                grid_id =  datetime(year, month, day)
+            else:
+                grid_id = int(grid_id)
+
         if type(grid_id) is int:
             start = self.config['start_timestep']
             end =  start + self.config['num_timesteps']
@@ -355,6 +398,12 @@ class TemporalMultiGrid (MultiGrid):
                 return grid_id - start
             else:
                 raise IndexError('start_timestep <= timestep <= end_timestep')
+
+        if type(grid_id) is datetime:
+            keys = [k for k in self.config['grid_name_map'].keys()\
+                    if k[0] == grid_id]
+            return [self.config['grid_name_map'][k][0] for k in keys][0]
+            
         
         return super().lookup_grid_number(grid_id)
 
@@ -604,7 +653,7 @@ class TemporalMultiGrid (MultiGrid):
         if grid_id in self.grid_id_list():
             return self.get_grids(grid_id, flat)
 
-        raise common.InvalidGridIDError('Grid id not Valid:', grid_id)
+        raise errors.InvalidGridIDError('Grid id not Valid:', grid_id)
 
     def get_subgrids_by_id(self, grid_id, index, flat=True):
         """Gets all subgrids for a grid id
@@ -627,7 +676,7 @@ class TemporalMultiGrid (MultiGrid):
         if grid_id in self.grid_id_list():
             return self.get_grids(grid_id, index, flat)
 
-        raise common.InvalidGridIDError('Grid id not Valid:', grid_id)
+        raise errors.InvalidGridIDError('Grid id not Valid:', grid_id)
 
     def get_grids_at_timesteps(self, timesteps, flat=True):
         """Gets all grids for timesteps
@@ -647,7 +696,7 @@ class TemporalMultiGrid (MultiGrid):
         """
         for timestep in timesteps:
             if not timestep in self.timestep_range():
-                raise common.TimestepsError('Timestep not Valid:', timesteps)
+                raise errors.TimestepsError('Timestep not Valid:', timesteps)
 
         return self.get_grids(timesteps, flat)
 
@@ -671,7 +720,7 @@ class TemporalMultiGrid (MultiGrid):
         """
         for timestep in timesteps:
             if not timestep in self.timestep_range():
-                raise common.TimestepsError('Timestep not Valid:', timesteps)
+                raise errors.TimestepsError('Timestep not Valid:', timesteps)
         return self.get_subgrids(timesteps, index, flat)
 
     def get_grids_at_timestep(self, timestep, flat = True):
@@ -691,7 +740,7 @@ class TemporalMultiGrid (MultiGrid):
             grids 
         """
         if not timestep in self.timestep_range():
-            raise common.TimestepsError('Timestep not Valid:', timestep)
+            raise errors.TimestepsError('Timestep not Valid:', timestep)
         return self.get_grids(timestep, flat)
 
     def get_subgrids_at_timestep(self, timestep, index,  flat = True):
@@ -713,7 +762,7 @@ class TemporalMultiGrid (MultiGrid):
             grids 
         """
         if not timestep in self.timestep_range():
-            raise common.TimestepsError('Timestep not Valid:', timestep)
+            raise errors.TimestepsError('Timestep not Valid:', timestep)
         return self.get_subgrids(timestep, index, flat)
 
     def set_grid(self, grid_id, new_grid):
@@ -843,7 +892,7 @@ class TemporalMultiGrid (MultiGrid):
         """
         if grid_id in self.grid_id_list():
             self.set_grids(grid_id, new_grid)
-        raise common.InvalidGridIDError('Grid id not Valid:', grid_id)
+        raise errors.InvalidGridIDError('Grid id not Valid:', grid_id)
 
     def set_subgrids_by_id(self, grid_id, index, new_grid):
         """Sets a given grid at all time steps
@@ -859,7 +908,7 @@ class TemporalMultiGrid (MultiGrid):
         """
         if grid_id in self.grid_id_list():
             self.set_grids(grid_id, index, new_grid)
-        raise common.InvalidGridIDError('Grid id not Valid:', grid_id)
+        raise errors.InvalidGridIDError('Grid id not Valid:', grid_id)
 
     def set_grids_at_timesteps(self, timesteps, new_grid):
         """Sets all grids at given timesteps
@@ -873,7 +922,7 @@ class TemporalMultiGrid (MultiGrid):
         """
         for timestep in timesteps:
             if not timestep in self.timestep_range():
-                raise common.TimestepsError('Timestep not Valid:', timesteps)
+                raise errors.TimestepsError('Timestep not Valid:', timesteps)
         self.set_grids(timesteps, new_grid)
 
     def set_subgrids_at_timesteps(self, timesteps, index, new_grid):
@@ -890,7 +939,7 @@ class TemporalMultiGrid (MultiGrid):
         """
         for timestep in timesteps:
             if not timestep in self.timestep_range():
-                raise common.TimestepsError('Timestep not Valid:', timesteps)
+                raise errors.TimestepsError('Timestep not Valid:', timesteps)
         self.get_subgrids(timesteps, index, new_grid)
 
     def set_grids_at_timestep(self, timestep, new_grid):
@@ -904,7 +953,7 @@ class TemporalMultiGrid (MultiGrid):
             data to assign
         """
         if not timestep in self.timestep_range():
-            raise common.TimestepsError('Timestep not Valid:', timestep)
+            raise errors.TimestepsError('Timestep not Valid:', timestep)
         self.set_grids(timestep, new_grid)
 
     def set_subgrids_at_timestep(self, timestep, index, new_grid):
@@ -920,7 +969,7 @@ class TemporalMultiGrid (MultiGrid):
             data to assign
         """
         if not timestep in self.timestep_range():
-            raise common.TimestepsError('Timestep not Valid:', timestep)
+            raise errors.TimestepsError('Timestep not Valid:', timestep)
         self.set_subgrids(timestep, index, new_grid)
 
     def increment_time_step (self, carry_data_forward = True):
@@ -944,7 +993,7 @@ class TemporalMultiGrid (MultiGrid):
             self.config['timestep'] -= 1
             msg = 'The timestep could not be incremented, because the ' +\
                 'end of the period has been reached.'
-            raise common.IncrementTimeStepError(msg)
+            raise errors.IncrementTimeStepError(msg)
 
         if carry_data_forward:
             self.grids[self.config['timestep']][:] = \
@@ -961,7 +1010,8 @@ class TemporalMultiGrid (MultiGrid):
         int
             year of last time step in model
         """
-        return self.config['start_timestep'] + self.config['timestep']
+        return self.config['start_timestep'] + \
+            self.config['timestep'] * self.config['delta_timestep']
 
     def save_figure(
             self, grid_id, ts, filename, figure_func=figures.default, figure_args={}, data=None
@@ -1019,7 +1069,7 @@ class TemporalMultiGrid (MultiGrid):
             data = None
         try:
             clip_generated = clip_func(filename, data, clip_args)
-        except clip.CilpError:
+        except errors.ClipError:
             return False
         return clip_generated
 

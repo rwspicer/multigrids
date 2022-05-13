@@ -60,6 +60,11 @@ class Grid (MultiGrid):
             del self.config['grid_name_map']
         except KeyError:
             pass
+
+    def configure_grid_name_map(self, config):
+        """Grid has no grid_name_map
+        """
+        pass
     
     def create_memory_shape (self, config):
         """Construct the shape needed for multigrid in memory from 

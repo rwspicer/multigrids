@@ -6,9 +6,11 @@ Functions for generating figures
 """
 import matplotlib.pyplot as plt 
 import tempfile
-import glob
+# import glob
 import os
 import shutil
+
+from .import errors
 
 try:
     import moviepy.editor as mpe
@@ -17,9 +19,7 @@ except ImportError:
 
 from . import figures
 
-class CilpError(Exception):
-    """Raised for errors in clip generation
-    """
+
 
 def moviepy_installed():
     """checks MoviePy installation 
@@ -49,7 +49,7 @@ def default(filename, data, new_clip_args):
     clip_args.update(new_clip_args)
 
     if not moviepy_installed():
-        raise CilpError('MoviePy not installed')
+        raise errors.ClipError('MoviePy not installed')
 
     tempdir = None
     files = []

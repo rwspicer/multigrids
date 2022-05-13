@@ -11,6 +11,7 @@ import os
 import glob
 import copy
 from tempfile import mkdtemp
+from datetime import datetime
 
 import yaml
 import numpy as np
@@ -26,16 +27,7 @@ from .__metadata__ import __version__
 from . import figures
 
 # from .common import common.load_or_use_default, GridSizeMismatchError
-from . import common
-
-class MultigridConfigError (Exception):
-    """Raised if a multigrid class is missing its configuration"""
-
-class MultigridIOError (Exception):
-    """Raised during multigrid IO"""
-
-class MultigridFilterError (Exception):
-    """Raised during multigrid Filter ops"""
+from . import common, errors
 
 def is_subgrids_key(key):
     """Test if key is subgrids key
@@ -91,7 +83,7 @@ def is_grid_key(key):
     -------
     Bool
     """
-    return not is_subgrid_key(key) and type(key) in (int, str)
+    return not is_subgrid_key(key) and type(key) in (int, str,  datetime)
 
 
 class MultiGrid (object):
@@ -203,6 +195,10 @@ class MultiGrid (object):
                     'x_size': nX,
                     'y_size': nY,
                 }
+
+        if not 'grid_name_map' in self.config:
+            self.configure_grid_name_map(kwargs)
+
         # except KeyError:
         #     pass # no raster meta is a ok
 
@@ -377,10 +373,8 @@ class MultiGrid (object):
                 np.ones(config['grid_shape']) == \
                 np.ones(config['grid_shape'])
 
-        grid_names = common.load_or_use_default(kwargs, 'grid_names', [])
-        
-            
-        config['grid_name_map'] = self.create_grid_name_map(grid_names, config)
+        # grid_names = common.load_or_use_default(kwargs, 'grid_names', [])
+        # config['grid_name_map'] = self.create_grid_name_map(grid_names, config)
             
 
         config['filename'] = common.load_or_use_default(
@@ -466,7 +460,7 @@ class MultiGrid (object):
                 " a filename to the save function, or set the dataset_name in"+\
                 " the multigrid config to a value other than Unknown or" +\
                 " unknown."
-            raise MultigridIOError()
+            raise errors.MultigridIOError()
         elif file is None and self.config['dataset_name'].lower() != "Unknown":
             file = self.config['dataset_name'].lower().replace(' ','_') + '.yml'
 
@@ -572,23 +566,22 @@ class MultiGrid (object):
             )
         self._is_temp = False
 
-    def create_grid_name_map(self, grid_names, config):
-        """Creates a dictionary to map string grid names to their 
-        interger index values. Used to initialize gird_name_map
+    def configure_grid_name_map(self, config):
+        """Configures the grid name map and sets in in config
         
         Paramaters
         ----------
-        grid_names: list of strings
-            List of grid names. Length == num_grids
-
-        Returns
-        -------
-        Dict:
-            String: int, key value pairs
+        config:
+            dict containing 'grid_names' a list 
         """
+        grid_names = common.load_or_use_default(common, 'grid_names', [])
         if len(grid_names) > 0 and config['num_grids'] != len(grid_names):
-            raise common.GridSizeMismatchError( 'grid name size mismatch' )
-        return {grid_names[i]: i for i in range(len(grid_names))}   
+            raise errors.GridNameMapConfigurationError(
+                'Grid name list length does not equal N grids'
+            )
+        self.config['grid_name_map'] = {
+            grid_names[i]: i for i in range(len(grid_names))
+        }   
 
     def setup_internal_memory(self, config):
         """Setup the internal memory representation of grids
@@ -682,10 +675,10 @@ class MultiGrid (object):
             shape of `data` is note equal to `grid_shape`
         """
         if name in self.filters and force == False:
-            raise MultigridFilterError("filters contains %s filter" % name)
+            raise errors.MultigridFilterError("filters contains %s filter" % name)
 
         if data.shape != self.config['grid_shape']:
-            raise MultigridFilterError("filter shape does not match grid shape")
+            raise errors.MultigridFilterError("filter shape does not match grid shape")
     
         self.filters[name] = data
 
@@ -706,7 +699,7 @@ class MultiGrid (object):
         if name in self.filters or name is None:
             self.current_filter = name
         else:
-            raise MultigridFilterError("invalid filter: %s" % name)
+            raise errors.MultigridFilterError("invalid filter: %s" % name)
     
     def deactivate_filter(self):
         """set cuttent_filter to None

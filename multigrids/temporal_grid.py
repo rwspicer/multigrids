@@ -5,7 +5,10 @@ import yaml
 # import figures
 import os
 
-from . import common
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
+
+from . import common, errors
 from . import clip
 
 class TemporalGrid (MultiGrid):
@@ -51,17 +54,58 @@ class TemporalGrid (MultiGrid):
         self.config['num_timesteps'] = self.num_timesteps
         self.config['timestep'] = 0
         self.grid = self.grids[0]
-        self.config['delta_timestep'] = "unknown"
+
+        # self.config['delta_timestep'] = "unknown"
         # self.config['start_timestep'] = 0
 
-    def reset_grid_name_map(self, delta_timestep):
-        """"""
-        delta_timestep = delta_timestep.lower()
-        if delta_timestep == "year":
-            self.config['delta_timestep'] = "year"
-            sy = self.config['start_timestep']
-            ny = self.config['num_timesteps']
-            self.config["grid_name_map"] = {"%s" % (sy + y): y for y in range(ny)}
+    def configure_grid_name_map(self, config):
+        """Configures the grid name map and sets in in config
+        
+        Paramaters
+        ----------
+        config:
+            dict containing delta_timestep which is a string, a relativedelta,
+            or a dict with 'units' a string and 'delta' an int
+        """
+        try:
+            delta_timestep = config['delta_timestep']
+        except KeyError:
+            #assume year based
+            delta_timestep = 'year'
+
+        if type(delta_timestep) is str:
+            units = delta_timestep
+            delta_timestep = 1
+        elif type(delta_timestep) is dict:
+            units = delta_timestep['units'].lower()
+            delta_timestep = delta_timestep['delta']
+
+        if type(delta_timestep) is int:
+            deltas = {
+                "year":relativedelta(years=delta_timestep),
+                "month":relativedelta(months=delta_timestep),
+                "day":relativedelta(days=delta_timestep),
+            }
+            delta_timestep = deltas[units] if units else None
+        
+        if not type(delta_timestep) is relativedelta:
+            raise errors.GridNameMapConfigurationError(
+                'Delta Timestep could not be inferred'
+            )
+
+        
+        sts = self.config['start_timestep']
+        if type(sts) is int and units == 'year':
+            delta_timestep = 1
+
+        nts = self.num_timesteps
+
+        self.config["grid_name_map"] = {
+            sts + n * delta_timestep: n for n in range(nts)
+        }
+        
+        self.config['delta_timestep'] = delta_timestep
+
 
     def new(self, *args, **kwargs):
         """Does setup for a new TemporalGrid object
@@ -141,14 +185,26 @@ class TemporalGrid (MultiGrid):
         int
             gird id
         """
+        if type(grid_id) is str:
+            # date, time grid_id.split('T') ## add times
+            fields = grid_id.split('-')
+            if  len(fields) > 1:
+                year = int(fields[0])
+                month = int(fields[1]) if len(fields) > 1 else 1
+                day = int(fields[2]) if len(fields) > 2 else 1
+            
+                grid_id =  datetime(year, month, day)
+            else:
+                grid_id = int(grid_id)
+
         if type(grid_id) is int:
             start = self.config['start_timestep']
             end =  start + self.config['num_timesteps']
             if start <= grid_id <= end:
                 return grid_id - start
             else:
-                raise IndexError('start_timestep <= timestep <= end_timestep')
-        
+                raise IndexError('start_timestep <= timestep <= end_timestep')               
+
         return super().lookup_grid_number(grid_id)
     
     def increment_time_step (self):
@@ -161,23 +217,26 @@ class TemporalGrid (MultiGrid):
         """
         # if archive_results:
         #     self.write_to_pickle(self.pickle_path)
-        self.timestep += 1
+        self.config['timestep'] += 1
         
-        if self.timestep >= self.num_timesteps:
-            self.timestep -= 1
+        if self.config['timestep'] >= self.num_timesteps:
+            self.config['timestep'] -= 1
             msg = 'The timestep could not be incremented, because the ' +\
                 'end of the period has been reached.'
-            raise common.IncrementTimeStepError(msg)
-        self.grids[self.timestep][:] = self.grids[self.timestep-1][:] 
-        self.grid = self.grids[self.timestep]
+            raise errors.IncrementTimeStepError(msg)
+        self.grids[self.config['timestep']][:] = \
+            self.grids[self.config['timestep']-1][:] 
+        self.grid = self.grids[self.config['timestep']]
         
         return self.current_timestep()
     
+
     def timestep_range(self):
         """get the range of time steps"""
         return range(
             self.config['start_timestep'], 
-            self.config['start_timestep'] + self.config['num_timesteps']
+            self.config['start_timestep'] + self.config['num_timesteps'] *\
+                 self.config['delta_timesteep']
         )
     
     def save_clip(self, filename, clip_func=clip.default, clip_args={}):
@@ -188,7 +247,7 @@ class TemporalGrid (MultiGrid):
       
         try:
             clip_generated = clip_func(filename, data, clip_args)
-        except clip.CilpError:
+        except errors.ClipError:
             return False
         return clip_generated
     
@@ -200,7 +259,8 @@ class TemporalGrid (MultiGrid):
         int
             year of last time step in model
         """
-        return self.config['start_timestep'] + self.config['timestep']
+        return self.config['start_timestep'] + \
+            self.config['timestep'] * self.config['delta_timestep']
 
     def create_subset(self, subset_grids):
         """creates a multigrid containting only the subset_girds
