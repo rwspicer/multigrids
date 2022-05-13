@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.7.4] - 2022-05-12
+### fixes
+- fixes __getitem__ for getting multiple grids/sub-grides with string based
+indices
+
 ## [0.7.3] - 2022-05-11
 ### fixes
 - issues with saving existing grids to update metadata

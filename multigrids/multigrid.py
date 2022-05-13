@@ -253,14 +253,18 @@ class MultiGrid (object):
         if is_subgrids_key(key):
             ## multiple subgrids
             nk = key[0]
-            if type(nk) is slice:
-                nk = range(nk.start,nk.stop,(nk.step if nk.step else 1))
+            # if type(nk) is slice:
+            #     nk = self.lookup_grid_range(
+            #         nk.start,nk.stop,(nk.step if nk.step else 1)
+            #     )
             grids = self.get_subgrids(nk, key[1:], False)
 
         elif is_grids_key(key):
             ## multiple Grids
-            if type(key) is slice:
-                key = range(key.start,key.stop,(key.step if key.step else 1))
+            # if type(key) is slice:
+            #     key = self.lookup_grid_range(
+            #         key.start,key.stop,(key.step if key.step else 1)
+            #     )
             grids = self.get_grids(key, False) 
 
         elif is_subgrid_key(key): ## single subgrid
