@@ -783,9 +783,14 @@ class MultiGrid (object):
         if not type(grid_ids) in [slice, range]:
             grid_ids = [self.lookup_grid_number(gid) for gid in grid_ids]
         else:
-            grid_ids = self.lookup_grid_range(
-                grid_ids.start, grid_ids.stop, grid_ids.step
-            )  
+            if grid_ids.start is None and  grid_ids.stop is None:
+                grid_ids = self.lookup_grid_slice(
+                    grid_ids.start, grid_ids.stop, grid_ids.step
+                )
+            else:
+                grid_ids = self.lookup_grid_range(
+                    grid_ids.start, grid_ids.stop, grid_ids.step
+                )  
         return grid_ids
 
     def get_grid(self, grid_id, flat = True):
@@ -807,10 +812,14 @@ class MultiGrid (object):
         """
         grid_id = self.lookup_grid_number(grid_id)
 
+
+
         _filter = self.current_filter
         _filter = self.filters[_filter].flatten() if _filter else 1
-
+        # if _filter != 1:
         grid = self.grids[grid_id] * _filter
+        # else:
+        #     grid = self.grids[grid_id]
         if flat:
             return grid
         return grid.reshape(self.config['grid_shape'])
@@ -839,7 +848,7 @@ class MultiGrid (object):
             return subgrid.flatten()
         return subgrid
 
-    def get_grids(self, grid_ids, flat = True):
+    def get_grids(self, grid_ids, flat = True, write_protect = True):
         """Get a set of grids
         
         Parameters
@@ -849,19 +858,30 @@ class MultiGrid (object):
         flat: bool, defaults true
             If true, each grid is flattend and the returned value
             is 2D, otherwise returned value is 3D
+        write_protect: bool
+            convert possible memmaps to arrays to ensure data my not 
+            be accidentally overwritten
 
         Returns
         -------
         np.array
             2d if flat, 3d otherwise.
             Filter is applied if `set_filter` has been called
-        """
+        """    
         grid_ids = self.lookup_grid_numbers(grid_ids)
 
         _filter = self.current_filter
-        _filter = self.filters[_filter].flatten() if _filter else 1
+        if _filter:
+            _filter = self.filters[_filter].flatten() #if _filter else 1
+            grids = self.grids[grid_ids] * _filter
+        else:
+            
+            grids = self.grids[grid_ids]# * _filter
+            if write_protect:
+                grids = np.array(grids)
 
-        grids = self.grids[grid_ids] * _filter
+
+        
         if flat:
             return grids
         rows, cols = self.config['grid_shape']
@@ -887,7 +907,7 @@ class MultiGrid (object):
             Filter is applied if `set_filter` has been called
         """
         # print(index)
-        grids = self.get_grids(grid_ids, False)
+        grids = self.get_grids(grid_ids, False, False)
 
         if type(index) is tuple and len(index) == 2:
             index = slice(None,None), index[0], index[1]
@@ -897,7 +917,7 @@ class MultiGrid (object):
         else:
             index = slice(None,None), index
         
-        subgrids = grids[index]
+        subgrids = np.array(grids[index])
         shape = subgrids.shape
         if flat and len(shape) == 3:
             return subgrids.reshape(shape[0], shape[1] * shape[2])

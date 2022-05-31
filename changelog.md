@@ -1,6 +1,16 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2022-05-31
+### changed
+- creation methods for grid name map have been renamed and rewritten
+- filters have been refactored
+
+### added
+- added support for using datetime indices in TemporalGrid, and 
+TemporalMultiGrid
+- errors.py as central location for exceptions
+
 ## [0.7.4] - 2022-05-12
 ### fixes
 - fixes __getitem__ for getting multiple grids/sub-grides with string based

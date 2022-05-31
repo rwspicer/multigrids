@@ -55,8 +55,18 @@ class TemporalGrid (MultiGrid):
         self.config['timestep'] = 0
         self.grid = self.grids[0]
 
+
+        self.configure_grid_name_map(kwargs)
+
         # self.config['delta_timestep'] = "unknown"
         # self.config['start_timestep'] = 0
+
+    def convert_timesteps_to_julian_days(self):
+        """
+        """
+        timesteps = list(self.config['grid_name_map'].keys())
+        start = self.config['start_timestep']
+        return [(ts - start).days for ts in timesteps]
 
     def configure_grid_name_map(self, config):
         """Configures the grid name map and sets in in config
@@ -71,7 +81,29 @@ class TemporalGrid (MultiGrid):
             delta_timestep = config['delta_timestep']
         except KeyError:
             #assume year based
-            delta_timestep = 'year'
+            if 'grid_name_map' in self.config:
+                key = list(self.config['grid_name_map'].keys())[0]
+                key = key.split('-')
+                year, month, day = 1901, 1, 1
+                if len(key) == 1:
+                    delta_timestep = 'year'
+                    year = int(key[0])
+                elif len(key) == 2:
+                    delta_timestep = 'month'
+                    year = int(key[0])
+                    month = int(key[1])
+                elif len(key) == 3:
+                    delta_timestep = 'day'
+                    year = int(key[0])
+                    month = int(key[1])
+                    day = int(key[2])
+                else:
+                    raise errors.GridNameMapConfigurationError(
+                        'Delta Timestep could not be inferred'
+                    )
+                self.config['start_timestep'] = datetime(year,month,day)
+            else:
+                delta_timestep = 'year'
 
         if type(delta_timestep) is str:
             units = delta_timestep
@@ -231,12 +263,13 @@ class TemporalGrid (MultiGrid):
         return self.current_timestep()
     
 
-    def timestep_range(self):
+    def timestep_range(self, step = 1):
         """get the range of time steps"""
         return range(
             self.config['start_timestep'], 
             self.config['start_timestep'] + self.config['num_timesteps'] *\
-                 self.config['delta_timesteep']
+                 self.config['delta_timestep'],
+            step
         )
     
     def save_clip(self, filename, clip_func=clip.default, clip_args={}):
