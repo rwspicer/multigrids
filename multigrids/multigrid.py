@@ -287,8 +287,8 @@ class MultiGrid (object):
         if is_subgrids_key(key):
             ## multiple subgrids
             nk = key[0]
-            if type(nk) is slice:
-                nk = range(nk.start,nk.stop,(nk.step if nk.step else 1))
+            # if type(nk) is slice:
+            #     nk = range(nk.start,nk.stop,(nk.step if nk.step else 1))
             self.set_subgrids(nk, key[1:], value)
 
         elif is_grids_key(key):
@@ -423,9 +423,13 @@ class MultiGrid (object):
                 os.path.split(config['mask'])[0] != cfg_path:
             config['mask'] = os.path.join(cfg_path, config['mask'])  
 
-        if type(config['filters']) is str and \
-                os.path.split(config['filters'])[0] != cfg_path:
-            config['filters'] = os.path.join(cfg_path, config['filters'])  
+        if 'filters' in config:
+            if type(config['filters']) is str and \
+                    os.path.split(config['filters'])[0] != cfg_path:
+                config['filters'] = os.path.join(cfg_path, config['filters'])  
+        else:
+            config['filters'] = None
+        
         
 
         config['memory_shape'] = self.create_memory_shape(config)
@@ -525,6 +529,8 @@ class MultiGrid (object):
             del f_data ## close file
             
             s_config['filters'] = f_map
+        else:
+            s_config['filters'] = None
 
         if 'mask' in s_config:
             try:
@@ -817,6 +823,7 @@ class MultiGrid (object):
         _filter = self.current_filter
         _filter = self.filters[_filter].flatten() if _filter else 1
         # if _filter != 1:
+        # print(grid_id)
         grid = self.grids[grid_id] * _filter
         # else:
         #     grid = self.grids[grid_id]
@@ -998,6 +1005,8 @@ class MultiGrid (object):
             otherwise there is a new grid for each
         """
         grid_ids = self.lookup_grid_numbers(grid_ids)
+        if type(grid_ids) is slice:
+            grid_ids = self.lookup_grid_range(grid_ids.start, grid_ids.stop, grid_ids.step)
 
         shape = self.config['grid_shape']
         sub_shape = self.grids[0].reshape(shape)[index].shape

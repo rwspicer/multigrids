@@ -55,7 +55,7 @@ class TemporalGrid (MultiGrid):
         self.config['timestep'] = 0
         self.grid = self.grids[0]
 
-
+        # print(self.config['delta_timestep'])
         self.configure_grid_name_map(kwargs)
 
         # self.config['delta_timestep'] = "unknown"
@@ -78,30 +78,38 @@ class TemporalGrid (MultiGrid):
             or a dict with 'units' a string and 'delta' an int
         """
         try:
-            delta_timestep = config['delta_timestep']
+            delta_timestep = self.config['delta_timestep'] 
         except KeyError:
             #assume year based
             if 'grid_name_map' in self.config:
                 key = list(self.config['grid_name_map'].keys())[0]
-                key = key.split('-')
-                year, month, day = 1901, 1, 1
-                if len(key) == 1:
-                    delta_timestep = 'year'
-                    year = int(key[0])
-                elif len(key) == 2:
-                    delta_timestep = 'month'
-                    year = int(key[0])
-                    month = int(key[1])
-                elif len(key) == 3:
-                    delta_timestep = 'day'
-                    year = int(key[0])
-                    month = int(key[1])
-                    day = int(key[2])
+                if type(key) is str:
+                    key = key.split('-')
+                    year, month, day = 1066, 1, 1
+                    if len(key) == 1:
+                        delta_timestep = 'year'
+                        year = int(key[0])
+                    elif len(key) == 2:
+                        delta_timestep = 'month'
+                        year = int(key[0])
+                        month = int(key[1])
+                    elif len(key) == 3:
+                        delta_timestep = 'day'
+                        year = int(key[0])
+                        month = int(key[1])
+                        day = int(key[2])
+                    else:
+                        raise errors.GridNameMapConfigurationError(
+                            'Delta Timestep could not be inferred'
+                        )
+                    try:
+                        self.config['start_timestep'] = datetime(year,month,day)
+                    except:
+                        self.config['start_timestep'] = datetime(1066,month,day)
                 else:
-                    raise errors.GridNameMapConfigurationError(
-                        'Delta Timestep could not be inferred'
-                    )
-                self.config['start_timestep'] = datetime(year,month,day)
+                    ## datetime
+                    delta_timestep = list(self.config['grid_name_map'].keys())[1] - key
+                    delta_timestep = relativedelta(delta_timestep)
             else:
                 delta_timestep = 'year'
 
@@ -111,6 +119,8 @@ class TemporalGrid (MultiGrid):
         elif type(delta_timestep) is dict:
             units = delta_timestep['units'].lower()
             delta_timestep = delta_timestep['delta']
+        else:
+            units = 'year' # defaults to year if ts is int
 
         if type(delta_timestep) is int:
             deltas = {
@@ -135,8 +145,9 @@ class TemporalGrid (MultiGrid):
         self.config["grid_name_map"] = {
             sts + n * delta_timestep: n for n in range(nts)
         }
-        
+        # print(delta_timestep)
         self.config['delta_timestep'] = delta_timestep
+        
 
 
     def new(self, *args, **kwargs):
@@ -158,7 +169,7 @@ class TemporalGrid (MultiGrid):
             array to be used as internal memory.
         """
         config = {}
-        ib = common.load_or_use_default(kwargs, 'start_timestep', 0)
+        ib = common.load_or_use_default(kwargs, 'start_timestep', 1066)
         config['start_timestep'] = ib
         kwargs['grid_names'] = [str(i) for i in range(ib, ib + args[2])]
         mg_config, grids = super(TemporalGrid, self).new(*args, **kwargs)
@@ -231,9 +242,15 @@ class TemporalGrid (MultiGrid):
 
         if type(grid_id) is int:
             start = self.config['start_timestep']
-            end =  start + self.config['num_timesteps']
+            if type(start) is int:
+                end =  start + self.config['num_timesteps']
+            else: #datetime
+                end = start + self.config['num_timesteps'] * self.config['delta_timestep']
+                grid_id = datetime(grid_id,1,1) ## only times this is an int if dts is a year
             if start <= grid_id <= end:
-                return grid_id - start
+                if type(grid_id) is int:
+                    return grid_id - start
+                
             else:
                 raise IndexError('start_timestep <= timestep <= end_timestep')               
 
