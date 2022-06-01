@@ -111,10 +111,15 @@ class TemporalMultiGrid (MultiGrid):
         grid_names = common.load_or_use_default(config, 'grid_names', [])
 
         try:
-            delta_timestep = config['delta_timestep']
+            if 'delta_timestep' in config:
+                delta_timestep = config['delta_timestep']
+            else:
+                delta_timestep = self.config['delta_timestep']
         except KeyError:
             #assume year based
             delta_timestep = 'year'
+
+        # print(delta_timestep)
 
         if type(delta_timestep) is str:
             units = delta_timestep
@@ -122,6 +127,8 @@ class TemporalMultiGrid (MultiGrid):
         elif type(delta_timestep) is dict:
             units = delta_timestep['units'].lower()
             delta_timestep = delta_timestep['delta'].lower()
+        else:
+            units = 'year' ## defaults to year
 
         if type(delta_timestep) is int:
             deltas = {
@@ -130,7 +137,7 @@ class TemporalMultiGrid (MultiGrid):
                 "day":relativedelta(days=delta_timestep),
             }
             delta_timestep = deltas[units] if units else None
-        
+
         if not type(delta_timestep) is relativedelta:
             raise errors.GridNameMapConfigurationError(
                 'Delta Timestep could not be inferred'
@@ -148,6 +155,7 @@ class TemporalMultiGrid (MultiGrid):
             for gn, name in enumerate(grid_names):
                 gnm[(ts, name)] = (n, gn)
 
+        # print(gnm)
         required_size = self.config['num_grids'] * nts
         if len(gnm) > 0 and required_size != len(gnm):
             raise errors.GridSizeMismatchError( 'grid name size mismatch' )
@@ -180,7 +188,7 @@ class TemporalMultiGrid (MultiGrid):
         return range(
             self.config['start_timestep'], 
             self.config['start_timestep'] + self.config['num_timesteps'] * \
-                self.config['delta_timesteep']
+                self.config['delta_timestep']
         )
 
     def create_memory_shape (self,config):
@@ -254,9 +262,8 @@ class TemporalMultiGrid (MultiGrid):
         timesteps = key[0]
         # print (timesteps, grids, index)
 
-
+        # print(index, timesteps, grids)
         if index is None: #whole grids
-
             if grids is None or grids == slice(None):
                 return self.get_grids(timesteps, False)
             elif timesteps == slice(None):
@@ -271,7 +278,9 @@ class TemporalMultiGrid (MultiGrid):
                     for gn in grids:
                         grid_ids.append((ts, gn))
                 if len(grid_ids) == 1:
+                    
                     return self.get_grid(grid_ids[0], False)
+                
                 return self.get_grids(grid_ids, False)
 
 
@@ -393,9 +402,14 @@ class TemporalMultiGrid (MultiGrid):
 
         if type(grid_id) is int:
             start = self.config['start_timestep']
-            end =  start + self.config['num_timesteps']
+            if type(start) is int:
+                end =  start + self.config['num_timesteps']
+            else: #datetime
+                end = start + self.config['num_timesteps'] * self.config['delta_timestep']
+                grid_id = datetime(grid_id,1,1) ## only times this is an int if dts is a year
             if start <= grid_id <= end:
-                return grid_id - start
+                if type(grid_id) is int:
+                    return grid_id - start
             else:
                 raise IndexError('start_timestep <= timestep <= end_timestep')
 
@@ -478,7 +492,6 @@ class TemporalMultiGrid (MultiGrid):
             grid_ids = [grid_ids]
         
         if not type(grid_ids) in [slice, range]:
-
             ## This code may improve data access options
             # if type(grid_ids) in [list, tuple] and len(grid_ids) == 2 and \
             #         type(grid_ids[0]) in [slice, range, tuple, set, list] and \
@@ -495,7 +508,7 @@ class TemporalMultiGrid (MultiGrid):
             #     grid_ids = temp
             #     print(grid_ids)
 
-            if type(grid_ids) is int:
+            if type(grid_ids) in (int, str):
                 return self.lookup_grid_number(grid_ids)
             if all([gid in  self.grid_id_list() for gid in grid_ids]):
                 temp = []
@@ -504,7 +517,6 @@ class TemporalMultiGrid (MultiGrid):
                         if key[1] == grid_id:
                             temp.append(key)
                 grid_ids = sorted(temp)
-
             grid_ids = [self.lookup_grid_number(gid) for gid in grid_ids]
         else:
             # if type(grid_ids.start) is int and type(grid_ids.start) is int:
@@ -576,6 +588,7 @@ class TemporalMultiGrid (MultiGrid):
             2d if flat, 3d otherwise.
             Filter is applied if `set_filter` has been called
         """
+        # print('grid_n', grid_ids)
         grid_ids = self.lookup_grid_numbers(grid_ids)
         # print(grid_ids)
         if type(grid_ids) is list and \

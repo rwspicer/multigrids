@@ -62,7 +62,11 @@ class TemporalGrid (MultiGrid):
         # self.config['start_timestep'] = 0
 
     def convert_timesteps_to_julian_days(self):
-        """
+        """Convert timesteps into number of days since start date
+
+        Returns 
+        -------
+        list of ints
         """
         timesteps = list(self.config['grid_name_map'].keys())
         start = self.config['start_timestep']
@@ -71,7 +75,7 @@ class TemporalGrid (MultiGrid):
     def configure_grid_name_map(self, config):
         """Configures the grid name map and sets in in config
         
-        Paramaters
+        Parameters
         ----------
         config:
             dict containing delta_timestep which is a string, a relativedelta,
