@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [0.8.0] - 2022-05-31
+## [0.8.0] - 2022-06-01
 ### changed
 - creation methods for grid name map have been renamed and rewritten
 - filters have been refactored
