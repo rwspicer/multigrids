@@ -82,7 +82,10 @@ class TemporalGrid (MultiGrid):
             or a dict with 'units' a string and 'delta' an int
         """
         try:
-            delta_timestep = self.config['delta_timestep'] 
+            if 'delta_timestep' in config:
+                delta_timestep = config['delta_timestep'] 
+            else:
+                delta_timestep = self.config['delta_timestep'] 
         except KeyError:
             #assume year based
             if 'grid_name_map' in self.config:
@@ -175,7 +178,10 @@ class TemporalGrid (MultiGrid):
         config = {}
         ib = common.load_or_use_default(kwargs, 'start_timestep', 1066)
         config['start_timestep'] = ib
-        kwargs['grid_names'] = [str(i) for i in range(ib, ib + args[2])]
+        try:
+            kwargs['grid_names'] = [str(i) for i in range(ib, ib + args[2])]
+        except:
+            pass
         mg_config, grids = super(TemporalGrid, self).new(*args, **kwargs)
         mg_config.update(config)
         return mg_config, grids

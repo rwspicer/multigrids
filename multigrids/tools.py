@@ -25,7 +25,8 @@ from . import errors
 def create(data, 
         name="", description = "", mode='r+', 
         mask = None, grid_names = [], data_model = 'memmap',
-        filename = None, start_timestep = None, raster_metadata=None
+        filename = None, start_timestep = None, raster_metadata=None,
+        delta_timestep = None
     ):
     """Creates a Grid, MultiGrid, TemporalGrid, or TemporalMultiGrid, based
     on shape of data, and charateristics of other parameters passed.
@@ -99,7 +100,8 @@ def create(data,
         data_model = data_model,
         filename = filename,
         initial_data = data,
-        start_timestep = start_timestep
+        start_timestep = start_timestep,
+        delta_timestep=delta_timestep
     )
 
     if not raster_metadata is None:
