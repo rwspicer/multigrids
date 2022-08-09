@@ -289,12 +289,15 @@ class TemporalGrid (MultiGrid):
 
     def timestep_range(self, step = 1):
         """get the range of time steps"""
-        return range(
-            self.config['start_timestep'], 
-            self.config['start_timestep'] + self.config['num_timesteps'] *\
-                 self.config['delta_timestep'],
-            step
-        )
+        try:
+            return range(
+                self.config['start_timestep'], 
+                self.config['start_timestep'] + self.config['num_timesteps'] *\
+                    self.config['delta_timestep'],
+                step
+            )
+        except:
+            return sorted(list(self.config['grid_name_map'].keys()))
     
     def save_clip(self, filename, clip_func=clip.default, clip_args={}):
         """
