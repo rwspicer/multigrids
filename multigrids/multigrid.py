@@ -11,7 +11,7 @@ import os
 import glob
 import copy
 from tempfile import mkdtemp
-from datetime import datetime
+from datetime import datetime, date
 
 import yaml
 import numpy as np
@@ -83,7 +83,7 @@ def is_grid_key(key):
     -------
     Bool
     """
-    return not is_subgrid_key(key) and type(key) in (int, str,  datetime)
+    return not is_subgrid_key(key) and type(key) in (int, str,  datetime, date)
 
 
 class MultiGrid (object):

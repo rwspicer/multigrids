@@ -5,7 +5,7 @@ import yaml
 # import figures
 import os
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 
 from . import common, errors
@@ -240,9 +240,11 @@ class TemporalGrid (MultiGrid):
                 month = int(fields[1]) if len(fields) > 1 else 1
                 day = int(fields[2]) if len(fields) > 2 else 1
             
-                grid_id =  datetime(year, month, day)
+                grid_id =  date(year, month, day)
             else:
                 grid_id = int(grid_id)
+
+
 
         if type(grid_id) is int:
             start = self.config['start_timestep']
@@ -258,6 +260,7 @@ class TemporalGrid (MultiGrid):
             else:
                 raise IndexError('start_timestep <= timestep <= end_timestep')               
 
+        # print(grid_id)
         return super().lookup_grid_number(grid_id)
     
     def increment_time_step (self):
