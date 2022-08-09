@@ -167,6 +167,13 @@ def tiffs_to_array (
             "Directory and wild card being used:", 
             directory, file_name_structure
         )
+
+    temp_file = os.path.join(directory, 'temp.mgdata')
+    if 'filename' in kwargs:
+        temp_file = kwargs['filename']
+        
+
+
     path = os.path.join(directory, file_name_structure)
     files = glob.glob(path)
     files = sort_func(files)
@@ -192,9 +199,9 @@ def tiffs_to_array (
             if verbose:
                 print('\tArray shape:', shape)
 
-            ## TODO: add init data?
+            ## TODO: add init data? like 0s or something
             ## TODO: add option to create as an array
-            array = np.memmap(os.path.join(directory, 'temp.mgdata'),
+            array = np.memmap(temp_file,
                 shape=shape, dtype=dtype, mode='w+') 
                 
         array[ix][:] = grid
@@ -215,6 +222,10 @@ def binary_to_array(
             "Directory and wild card being used:", 
             directory, file_name_structure
         )
+
+    temp_file = os.path.join(directory, 'temp.mgdata')
+    if 'filename' in kwargs:
+        temp_file = kwargs['filename']
     
     path = os.path.join(directory, file_name_structure)
     print('bta path',path)
@@ -232,7 +243,7 @@ def binary_to_array(
 
     shape = (len(files), kwargs['rows'], kwargs['cols'])
     dtype = np.fromfile(files[0]).dtype 
-    array = np.memmap(os.path.join(directory, 'temp.mgdata'),
+    array = np.memmap(temp_file,
                 shape=shape, dtype=dtype, mode='w+') 
 
     for ix, fi in enumerate(files):
@@ -282,11 +293,12 @@ def load_and_create( load_params = {}, create_params = {}):
         load_function = binary_to_array
     else:
         return False 
-    
+
     data = load_function(**load_params)
     grid = create(data, **create_params)
-
+    
     return grid
+
     
 def combine(inputs, result_name, 
         final_extent = None, temp_dir = './TEMP-COMBINE', warp_options=[],
