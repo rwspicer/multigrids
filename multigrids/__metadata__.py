@@ -1,2 +1,2 @@
 __url__ = "https://github.com/rwspicer/multigrids"
-__version__ = "0.8.2"
+__version__ = "0.8.3"

@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.8.3] - 2022-08-09
+### fixes
+- TemporalGrid.lookup_grid_name wont fail if keys are datetime now and not just date.
+
 ## [0.8.2] - 2022-08-09
 ### added
 - multigrids keys support date and datetime.
