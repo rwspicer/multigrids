@@ -5,7 +5,7 @@ import yaml
 # import figures
 import os
 
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, time
 from dateutil.relativedelta import relativedelta
 
 from . import common, errors
@@ -267,7 +267,12 @@ class TemporalGrid (MultiGrid):
                 raise IndexError('start_timestep <= timestep <= end_timestep')               
 
         # print(grid_id)
-        return super().lookup_grid_number(grid_id)
+        try:
+            return super().lookup_grid_number(grid_id)
+        except KeyError as e:
+            if type(grid_id) is date:
+                return super().lookup_grid_number(datetime.combine(grid_id, time()))
+            raise KeyError (e)
     
     def increment_time_step (self):
         """increment time_step, 
