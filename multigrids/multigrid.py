@@ -590,7 +590,7 @@ class MultiGrid (object):
         config:
             dict containing 'grid_names' a list 
         """
-        grid_names = common.load_or_use_default(common, 'grid_names', [])
+        grid_names = common.load_or_use_default(config, 'grid_names', [])
         if len(grid_names) > 0 and config['num_grids'] != len(grid_names):
             raise errors.GridNameMapConfigurationError(
                 'Grid name list length does not equal N grids'
