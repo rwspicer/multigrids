@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.8.1] - 2022-06-13
+### fixed
+- bugs in MultiGrid.configure_grid_name_map and 
+  TemporalGrid.configure_grid_name_map
+
 ## [0.8.0] - 2022-06-01
 ### changed
 - creation methods for grid name map have been renamed and rewritten
