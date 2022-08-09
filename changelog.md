@@ -1,6 +1,17 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.8.2] - 2022-08-09
+### added
+- multigrids keys support date and datetime.
+- option for loading functions in tool.py to specify were temp data is stored
+
+### fixed
+- bug were absolute path to data file was written to .yml file when save is 
+called is corrected to relative path.
+- bug were timestep_range could not complete due to temporal gird using date
+based keys
+
 ## [0.8.1] - 2022-06-13
 ### fixed
 - bugs in MultiGrid.configure_grid_name_map and 
