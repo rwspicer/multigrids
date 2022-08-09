@@ -549,9 +549,19 @@ class MultiGrid (object):
             os.rename(mask_file + '.npy', mask_file)
             s_config['mask'] = os.path.split(mask_file)[-1]
 
+            
+        
+        ### ensure filename is not an absolute path in saved yml metadata
+        filename = s_config['filename']
+        while os.path.split(filename)[0] != "":
+            filename = os.path.split(filename)[1]
+        s_config['filename'] = filename
+
         with open(file, 'w') as sfile:
             sfile.write('#Saved ' + self.__class__.__name__ + " metadata\n")
             yaml.dump(s_config, sfile, default_flow_style=False)
+
+        
 
         ## if were saving a memmap make sure the new mg object is pointing
         ## to the right file
