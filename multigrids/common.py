@@ -28,7 +28,7 @@ def open_or_create_memmap_grid(filename, mode, dtype, shape):
     """
     if not os.path.exists(filename) and mode in ('r','r+'):
         ## if file does not exist; initialize and delete
-        print(filename, dtype, shape)
+        print('Creating New:', filename, dtype, shape)
         grids = np.memmap(filename, dtype=dtype, mode='w+', shape=shape)           
         del(grids)
     return np.memmap(filename, dtype=dtype, mode=mode, shape=shape)

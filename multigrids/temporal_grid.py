@@ -134,10 +134,11 @@ class TemporalGrid (MultiGrid):
                 "year":relativedelta(years=delta_timestep),
                 "month":relativedelta(months=delta_timestep),
                 "day":relativedelta(days=delta_timestep),
+                "varies": 1, 
             }
             delta_timestep = deltas[units] if units else None
         
-        if not type(delta_timestep) is relativedelta:
+        if not type(delta_timestep) in [relativedelta, int] :
             raise errors.GridNameMapConfigurationError(
                 'Delta Timestep could not be inferred'
             )

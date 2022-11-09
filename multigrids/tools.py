@@ -26,7 +26,7 @@ def create(data,
         name="", description = "", mode='r+', 
         mask = None, grid_names = [], data_model = 'memmap',
         filename = None, start_timestep = None, raster_metadata=None,
-        delta_timestep = None
+        delta_timestep = None, shape=None, dtype=None, save_to = None
     ):
     """Creates a Grid, MultiGrid, TemporalGrid, or TemporalMultiGrid, based
     on shape of data, and charateristics of other parameters passed.
@@ -71,27 +71,35 @@ def create(data,
     else:
         temporal_data = True
 
-    dimensions = len(data.shape)
+    no_data = data is None
+    if no_data:
+        dimensions = len(shape)
+    else:  
+        dimensions = len(data.shape)
+        shape = data.shape
+
     if 2 == dimensions:
         GridClass = grid.Grid
-        args = data.shape
+        args = shape 
     elif 3 == dimensions and temporal_data:
         GridClass = temporal_grid.TemporalGrid
-        args = (data.shape[1], data.shape[2], data.shape[0])
+        args = (shape[1], shape[2], shape[0])
     elif 3 == dimensions and not temporal_data:
         GridClass = multigrid.MultiGrid
-        args = (data.shape[1], data.shape[2], data.shape[0])
+        args = (shape[1], shape[2], shape[0])
     elif 4 == dimensions:
         GridClass = temporal.TemporalMultiGrid
-        args = (data.shape[2], data.shape[3], data.shape[1], data.shape[0])
+        args = (shape[2], shape[3], shape[1], shape[0])
     else:
         raise errors.MultigridCreationError(
             "Cannot determine Which MultiGrid type to use from data"
         )
-    # print(grid)
+    # print('xx', data.filename)
+    # plt.imshow(data[0])
+    # plt.show()
     mg = GridClass(
         *args, 
-        data_type = data.dtype, 
+        data_type = data.dtype if (not data is None) else dtype, 
         mode=mode,
         dataset_name = name,
         description = description,
@@ -101,7 +109,8 @@ def create(data,
         filename = filename,
         initial_data = data,
         start_timestep = start_timestep,
-        delta_timestep=delta_timestep
+        delta_timestep=delta_timestep,
+        save_to = save_to
     )
 
     if not raster_metadata is None:
@@ -136,7 +145,7 @@ def get_raster_metadata(raster_file):
 
 def tiffs_to_array (
         directory = None, file_name_structure='*.tif', sort_func = sorted, 
-        verbose = False, **kwargs
+        verbose = False, precreated_grid = None, **kwargs
         ): 
     """reads a series of sorted tif files and stores data in an 3D array
 
@@ -170,10 +179,15 @@ def tiffs_to_array (
             directory, file_name_structure
         )
 
-    temp_file = os.path.join(directory, 'temp.mgdata')
-    if 'filename' in kwargs:
-        temp_file = kwargs['filename']
-        
+    if not precreated_grid:
+        temp_file = os.path.join(directory, 'temp.mgdata')
+        if 'filename' in kwargs:
+            temp_file = kwargs['filename']
+        shape = None
+        array = None
+    else:
+        shape = precreated_grid.config['real_shape']
+        array = precreated_grid.grids
 
 
     path = os.path.join(directory, file_name_structure)
@@ -188,8 +202,7 @@ def tiffs_to_array (
         for f in files[-15:]:
             print('\t', f)
 
-    shape = None
-    array = None
+    
     for ix, fi in enumerate(files):
         if verbose:
             print('Reading file:', os.path.split(fi)[1])
@@ -206,14 +219,16 @@ def tiffs_to_array (
             array = np.memmap(temp_file,
                 shape=shape, dtype=dtype, mode='w+') 
                 
-        array[ix][:] = grid
+        # print((grid == 0).all())
+        
+        array[ix][:] = grid if precreated_grid is None else grid.flatten()
         del (grid)
         
     return array 
 
 def binary_to_array(
         directory = None, file_name_structure='*.bin', sort_func = sorted, 
-        verbose = False, **kwargs
+        verbose = False, precreated_grid = None, **kwargs
     ):
     """
     """
@@ -225,9 +240,17 @@ def binary_to_array(
             directory, file_name_structure
         )
 
-    temp_file = os.path.join(directory, 'temp.mgdata')
-    if 'filename' in kwargs:
-        temp_file = kwargs['filename']
+    if not precreated_grid:
+        temp_file = os.path.join(directory, 'temp.mgdata')
+        if 'filename' in kwargs:
+            temp_file = kwargs['filename']
+        shape = (len(files), kwargs['rows'], kwargs['cols'])
+        dtype = np.fromfile(files[0]).dtype 
+        array = np.memmap(temp_file,
+                shape=shape, dtype=dtype, mode='w+') 
+    else:
+        shape = precreated_grid.config['real_shape']
+        array = precreated_grid.grids
     
     path = os.path.join(directory, file_name_structure)
     print('bta path',path)
@@ -243,10 +266,7 @@ def binary_to_array(
         for f in files[-15:]:
             print('\t', f)
 
-    shape = (len(files), kwargs['rows'], kwargs['cols'])
-    dtype = np.fromfile(files[0]).dtype 
-    array = np.memmap(temp_file,
-                shape=shape, dtype=dtype, mode='w+') 
+    
 
     for ix, fi in enumerate(files):
         grid =  np.fromfile(fi).reshape((kwargs['rows'], kwargs['cols']))
@@ -296,11 +316,92 @@ def load_and_create( load_params = {}, create_params = {}):
     else:
         return False 
 
+
     data = load_function(**load_params)
+
+    # plt.imshow(data[0])
+    # plt.show()
     grid = create(data, **create_params)
     
     return grid
 
+
+def create_and_load( load_params = {}, create_params = {}):
+    """loads data and creates a multigrid
+
+    Parameters
+    ----------
+    load_params: dict
+        parameters describing the data being loaded into a multigrid.
+        
+    create_params: dict 
+        parameters describing the MultiGrid being created
+
+    Returns
+    -------
+    Grid, MultiGrid, TemporalGrid, or TemporalMultiGrid
+    """
+    if load_params['method'] == 'tiff':
+        tiff_params = {
+            "directory": None, # have to supply a directory
+            "file_name_structure": '*.tif',
+            "sort_func": sorted, 
+            "verbose": False
+        }
+        tiff_params.update(load_params)
+        load_params = tiff_params
+        load_function = tiffs_to_array
+        path = os.path.join(
+            load_params['directory'], 
+            load_params['file_name_structure']
+        )
+        files = glob.glob(path)
+        grid, md = raster.load_raster(files[0])
+        
+        rows, cols = grid.shape
+        create_params['shape'] = (
+            len(files), rows, cols
+        )
+        create_params['dtype']  = grid.dtype
+        create_params['raster_metadata'] = md
+    elif load_params['method'] == 'binary':
+        ## need to have rows and cols load params
+        bin_params = {
+            "directory": None, # have to supply a directory
+            "file_name_structure": '*.bin',
+            "sort_func": sorted, 
+            "verbose": False,
+            
+        }
+        bin_params.update(load_params)
+        load_params = bin_params
+        load_function = binary_to_array
+        path = os.path.join(
+            load_params['directory'], 
+            load_params['file_name_structure']
+        )
+        files = glob.glob(path)
+        
+        create_params['shape'] = (
+            len(files), load_params['rows'], load_params['cols']
+        )
+        create_params['dtype']  = np.fromfile(files[0]).dtype 
+    else:
+        return False 
+    
+    # path = os.path.join(
+    #     load_params['directory'], 
+    #     load_load['file_name_structure']
+    # )
+    # files = glob.glob(path)
+    
+    # create_params['shape'] = (len(files), kwargs['rows'], kwargs['cols'])
+
+    grid = create(None, **create_params)
+    load_params['precreated_grid'] = grid
+    load_function(**load_params)
+    
+    return grid
     
 def combine(inputs, result_name, 
         final_extent = None, temp_dir = './TEMP-COMBINE', warp_options=[],

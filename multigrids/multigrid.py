@@ -198,6 +198,9 @@ class MultiGrid (object):
 
         if not 'grid_name_map' in self.config:
             self.configure_grid_name_map(kwargs)
+        
+        if 'save_to' in kwargs and not kwargs['save_to'] is None:
+            self.save(kwargs['save_to'])
 
         # except KeyError:
         #     pass # no raster meta is a ok
@@ -386,15 +389,25 @@ class MultiGrid (object):
         if config['data_model'] != 'memmap':
             config['data_model'] = 'array'
 
-        grids = self.setup_internal_memory(config)
-        
         init_data = common.load_or_use_default(kwargs, 'initial_data', None)
+        if not init_data is None and type(init_data) is np.memmap:
+            # plt.imshow(init_data[0])
+            # plt.show()
+            grids = init_data.reshape(config['memory_shape'])
+            config['filename'] = grids.filename
+        elif  not init_data is None:
+            grids = self.setup_internal_memory(config)
+            grids[:] = init_data.reshape(config['memory_shape'])
+        else:
+            grids = self.setup_internal_memory(config)
+        
+        # print(grids, type(grids), grids.filename)
+        
         
 
-        if not init_data is None:
-            grids = init_data.reshape(config['memory_shape'])
-
+        
         config['filters'] = None
+        
         
         return config, grids 
 
@@ -469,16 +482,21 @@ class MultiGrid (object):
             file = self.config['dataset_name'].lower().replace(' ','_') + '.yml'
 
         s_config = copy.deepcopy(self.config)
-        if s_config['data_model'] == 'array' or s_config['filename'] is None:
-            try:
-                path, grid_file = os.path.split(file)
-            except ValueError:
-                path, grid_file = './', file
-            if grid_file[0] == '.':
-                grid_file = '.' + grid_file[1:].split('.')[0] + grid_file_ext
-            else:
-                grid_file = grid_file.split('.')[0] + grid_file_ext
-            data_file = os.path.join(path,grid_file) 
+
+        try:
+            path, grid_file = os.path.split(file)
+        except ValueError:
+            path, grid_file = './', file
+
+        if grid_file[0] == '.':
+            grid_file = '.' + grid_file[1:].split('.')[0] + grid_file_ext
+        else:
+            grid_file = grid_file.split('.')[0] + grid_file_ext
+        data_file = os.path.join(path,grid_file) 
+
+        if s_config['data_model'] == 'array':
+            
+            
             save_file = np.memmap(
                 data_file, 
                 mode = 'w+', 
@@ -488,7 +506,22 @@ class MultiGrid (object):
             save_file[:] = self.grids[:]
             del save_file ## close file
             s_config['filename'] = os.path.split(data_file)[1]
-        
+
+        if s_config['filename'] is None:
+            current = self.grids.filename
+            # print(current, self.grids.filename, s_config['filename'])
+            t_shape =  self.grids.shape 
+            del(self.grids)
+            os.rename(current, data_file)
+            # from time import sleep
+            # sleep(10)
+            self.grids =  np.memmap(
+                data_file, 
+                mode = 'w+', 
+                dtype = s_config['data_type'], 
+                shape = t_shape
+            )
+            s_config['filename'] = os.path.split(data_file)[1]
         
         del s_config['memory_shape']
         del s_config['real_shape']
@@ -573,7 +606,7 @@ class MultiGrid (object):
             shape = self.grids.shape
             to_remove_filename = self.grids.filename
             del(self.grids) 
-            os.remove(to_remove_filename)
+            # os.remove(to_remove_filename)
             self.grids = np.memmap(
                 os.path.join(path,s_config['filename']), 
                 mode = self.config['mode'], 
