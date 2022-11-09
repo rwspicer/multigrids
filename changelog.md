@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.8.3] - 2022-11-09
+### adds
+- multipocess version of tiffs to array
+- create_and_load function
+- verbose argumnrt to common.open_or_create_memmap_grid
+
+### changes
+- load_and_create calls create_and_load for consistancy 
+
 ## [0.8.3] - 2022-08-09
 ### fixes
 - TemporalGrid.lookup_grid_name wont fail if keys are datetime now and not just date.
