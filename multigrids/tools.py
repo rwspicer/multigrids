@@ -10,6 +10,9 @@ import shutil
 from tempfile import mkdtemp
 import glob
 
+from multiprocessing import Process, active_children, cpu_count, Lock
+from time import sleep
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -26,7 +29,7 @@ def create(data,
         name="", description = "", mode='r+', 
         mask = None, grid_names = [], data_model = 'memmap',
         filename = None, start_timestep = None, raster_metadata=None,
-        delta_timestep = None
+        delta_timestep = None, force_temporal = False
     ):
     """Creates a Grid, MultiGrid, TemporalGrid, or TemporalMultiGrid, based
     on shape of data, and charateristics of other parameters passed.
@@ -66,7 +69,7 @@ def create(data,
     -------
     Grid, MultiGrid, TemporalGrid, or TemporalMultiGrid
     """
-    if start_timestep is None:
+    if start_timestep is None and not force_temporal:
         temporal_data = False
     else:
         temporal_data = True
@@ -211,6 +214,94 @@ def tiffs_to_array (
         
     return array 
 
+def mp_tiffs_to_array (
+        directory = None, file_name_structure='*.tif', sort_func = sorted, 
+        verbose = False, **kwargs
+        ): 
+    """reads a series of sorted tif files and stores data in an 3D array
+
+    Parameters
+    ----------
+    directory: path
+        directory containing tif files
+    file_name_structure: str, default '*.tif'
+        matching pattern passed to glob function to read tif files
+    sort_func: function, defaults sorted
+        sorting function, must return a list
+    verbose: bool, defaults False
+        if True debug messages are printed to console
+    **kwargs: 
+        this does nothing, but allows load and create to 
+        select from differently structure functions for loading data
+
+    Returns
+    -------
+    np.array or None
+        An array containing the data from the files. The shape is 
+    N_files, rows, cols, and the N_file dimension is sorted according to the 
+    sort_func used. None is returned if no files match file_name_structure
+    pattern
+    """
+    if directory is None:
+        raise IOError("directory dose not exist")
+    if verbose:
+        print(
+            "Directory and wild card being used:", 
+            directory, file_name_structure
+        )
+
+    if 'n_cores' in kwargs:
+        n_cores = min(kwargs['n_cores'], cpu_count())
+    else:
+        n_cores = cpu_count()
+
+    print(n_cores)
+
+    temp_file = os.path.join(directory, 'temp.mgdata')
+    if 'filename' in kwargs:
+        temp_file = kwargs['filename']
+        
+
+
+    path = os.path.join(directory, file_name_structure)
+    files = glob.glob(path)
+    files = sort_func(files)
+
+    if verbose:
+        print ("Displaying First  15 sorted files:")
+        for f in files[:15]:
+            print('\t', f)
+        print ("Displaying last  15 sorted files:")
+        for f in files[-15:]:
+            print('\t', f)
+
+    # shape = None
+    grid, md = raster.load_raster(files[0])
+    dtype = grid.dtype
+
+    rows, cols = grid.shape
+    shape = len(files), rows, cols
+    if verbose:
+        print('\tArray shape:', shape)
+    array = np.memmap(temp_file, shape=shape, dtype=dtype, mode='w+') 
+
+    def __load_and_store(array, ix, fi, lock):
+        grid, md = raster.load_raster(fi)
+        lock.acquire()
+        array[ix][:] = grid
+        lock.release()
+        del (grid)
+    lock = Lock()
+    print('starting')
+    for ix, fi in enumerate(files):
+        if verbose:
+            print('Reading file:', os.path.split(fi)[1])
+        Process(target=__load_and_store, args=(array, ix, fi, lock)).start()
+        while len(active_children()) > n_cores:
+            continue
+        
+    return array 
+
 def binary_to_array(
         directory = None, file_name_structure='*.bin', sort_func = sorted, 
         verbose = False, **kwargs
@@ -282,6 +373,16 @@ def load_and_create( load_params = {}, create_params = {}):
         tiff_params.update(load_params)
         load_params = tiff_params
         load_function = tiffs_to_array
+    elif load_params['method'] == 'mp_tiff':
+        tiff_params = {
+            "directory": None, # have to supply a directory
+            "file_name_structure": '*.tif',
+            "sort_func": sorted, 
+            "verbose": False
+        }
+        tiff_params.update(load_params)
+        load_params = tiff_params
+        load_function = mp_tiffs_to_array
     elif load_params['method'] == 'binary':
         ## need to have rows and cols load params
         bin_params = {
