@@ -390,6 +390,8 @@ class MultiGrid (object):
             config['data_model'] = 'array'
 
         init_data = common.load_or_use_default(kwargs, 'initial_data', None)
+
+        
         if not init_data is None and type(init_data) is np.memmap:
             # plt.imshow(init_data[0])
             # plt.show()
@@ -493,7 +495,7 @@ class MultiGrid (object):
         else:
             grid_file = grid_file.split('.')[0] + grid_file_ext
         data_file = os.path.join(path,grid_file) 
-
+        # print(s_config['filename'], self._is_temp)
         if s_config['data_model'] == 'array':
             
             
@@ -507,7 +509,7 @@ class MultiGrid (object):
             del save_file ## close file
             s_config['filename'] = os.path.split(data_file)[1]
 
-        if s_config['filename'] is None:
+        if s_config['filename'] is None or self._is_temp:
             current = self.grids.filename
             # print(current, self.grids.filename, s_config['filename'])
             t_shape =  self.grids.shape 
@@ -598,21 +600,22 @@ class MultiGrid (object):
 
         ## if were saving a memmap make sure the new mg object is pointing
         ## to the right file
-        if hasattr(self.grids, 'filename') and \
-                self.grids.filename != s_config['filename'] and \
-                self._is_temp:
-            # print(self.grids.filename, s_config['filename'])
-            path = os.path.split(file)[0]
-            shape = self.grids.shape
-            to_remove_filename = self.grids.filename
-            del(self.grids) 
-            # os.remove(to_remove_filename)
-            self.grids = np.memmap(
-                os.path.join(path,s_config['filename']), 
-                mode = self.config['mode'], 
-                dtype = self.config['data_type'], 
-                shape = shape
-            )
+        # print(s_config)
+        # if hasattr(self.grids, 'filename') and \
+        #         self.grids.filename != s_config['filename'] and \
+        #         self._is_temp:
+        #     # print(self.grids.filename, s_config['filename'])
+        #     path = os.path.split(file)[0]
+        #     shape = self.grids.shape
+        #     to_remove_filename = self.grids.filename
+        #     del(self.grids) 
+        #     # os.remove(to_remove_filename)
+        #     self.grids = np.memmap(
+        #         os.path.join(path,s_config['filename']), 
+        #         mode = self.config['mode'], 
+        #         dtype = self.config['data_type'], 
+        #         shape = shape
+        #     )
         self._is_temp = False
 
     def configure_grid_name_map(self, config):

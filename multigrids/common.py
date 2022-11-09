@@ -7,7 +7,7 @@ import os
 
 load_or_use_default = lambda c, k, d: c[k] if k in c else d
 
-def open_or_create_memmap_grid(filename, mode, dtype, shape):
+def open_or_create_memmap_grid(filename, mode, dtype, shape, verbose=False):
     """Initialize or open a memory mapped np.array.
     
     Parameters
@@ -28,7 +28,8 @@ def open_or_create_memmap_grid(filename, mode, dtype, shape):
     """
     if not os.path.exists(filename) and mode in ('r','r+'):
         ## if file does not exist; initialize and delete
-        print('Creating New:', filename, dtype, shape)
+        if verbose:
+            print('Creating New:', filename, dtype, shape)
         grids = np.memmap(filename, dtype=dtype, mode='w+', shape=shape)           
         del(grids)
     return np.memmap(filename, dtype=dtype, mode=mode, shape=shape)
