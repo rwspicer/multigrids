@@ -1,14 +1,20 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [0.8.3] - 2022-11-09
+## [0.9.1] - 2022-11-10
+### Changes
+- Changes behavior of save_to kwarg to overload filename and crate memmap in
+    correct location instead of a temp location and copying it to final 
+    location.
+
+## [0.9.0] - 2022-11-09
 ### adds
-- multipocess version of tiffs to array
+- multiprocess version of tiffs to array
 - create_and_load function
-- verbose argumnrt to common.open_or_create_memmap_grid
+- verbose argument to common.open_or_create_memmap_grid
 
 ### changes
-- load_and_create calls create_and_load for consistancy 
+- load_and_create calls create_and_load for consistency 
 
 ## [0.8.3] - 2022-08-09
 ### fixes

@@ -128,6 +128,9 @@ class MultiGrid (object):
         'filename': name of memory mapped file.
         'data_model': model of data in memory, 'array', or 'memmap'
         'grid_name_map': map of grid names to gird ids
+        'save_to': file.yml file location to save multigrid to on creation, this 
+            will overwrite value of file name file.grids.data
+        'verbose': if included logging is enabled for grid creation
     grids: np.memmap or np.ndarray 
     _is_temp: bool
         attribute to indicate if internal memmap is a tempfile
@@ -141,6 +144,11 @@ class MultiGrid (object):
         self._is_temp = False
         self.mask_file = None
         self.filter_file = None
+
+        if 'save_to' in kwargs and not kwargs['save_to'] is None:
+            kwargs['filename'] = kwargs['save_to'].replace(
+                '.yml', '.grids.data'
+            )
 
         if type(args[0]) is int:
             init_func = self.new
@@ -388,6 +396,10 @@ class MultiGrid (object):
         )
         if config['data_model'] != 'memmap':
             config['data_model'] = 'array'
+        
+        config['verbose'] = common.load_or_use_default(
+            kwargs, 'verbose', False
+        )
 
         init_data = common.load_or_use_default(kwargs, 'initial_data', None)
 
@@ -484,6 +496,7 @@ class MultiGrid (object):
             file = self.config['dataset_name'].lower().replace(' ','_') + '.yml'
 
         s_config = copy.deepcopy(self.config)
+        del(s_config['verbose'])
 
         try:
             path, grid_file = os.path.split(file)
@@ -496,6 +509,8 @@ class MultiGrid (object):
             grid_file = grid_file.split('.')[0] + grid_file_ext
         data_file = os.path.join(path,grid_file) 
         # print(s_config['filename'], self._is_temp)
+
+
         if s_config['data_model'] == 'array':
             
             
@@ -655,6 +670,7 @@ class MultiGrid (object):
         grids: np.array or np.memmap
         """
         filename = config['filename']
+        # print(filename, config['verbose'])
 
         if config['data_model'] == 'memmap':
             if filename is None:
@@ -665,7 +681,8 @@ class MultiGrid (object):
                 filename, 
                 config['mode'], 
                 config['data_type'], 
-                config['memory_shape']
+                config['memory_shape'],
+                config['verbose']
             )
             # config['filename '] = filename
 

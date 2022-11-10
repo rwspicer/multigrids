@@ -32,6 +32,9 @@ def open_or_create_memmap_grid(filename, mode, dtype, shape, verbose=False):
             print('Creating New:', filename, dtype, shape)
         grids = np.memmap(filename, dtype=dtype, mode='w+', shape=shape)           
         del(grids)
+    elif verbose:
+        print('Using existing: %s. Is This what you intended?' % filename)
+        
     return np.memmap(filename, dtype=dtype, mode=mode, shape=shape)
 
 def format_subgrid_index(index):
