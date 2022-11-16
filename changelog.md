@@ -1,6 +1,16 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+
+
+## [0.9.2] - 2022-11-16
+### Fixes
+- Loading a TemporalGrid does not fail if 'num_grids' is present when 
+    'num_timesteps' is missing.
+- Fixed bug where verbose was required as a config key when loading saved
+    muligrids
+
+
 ## [0.9.1] - 2022-11-10
 ### Changes
 - Changes behavior of save_to kwarg to overload filename and crate memmap in

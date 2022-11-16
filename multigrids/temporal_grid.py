@@ -45,7 +45,11 @@ class TemporalGrid (MultiGrid):
 
         if type(args[0]) is str:
             with open(args[0], 'r') as f:
-                self.num_timesteps = yaml.load(f, Loader=yaml.Loader)['num_timesteps']  
+                temp = yaml.load(f, Loader=yaml.Loader)
+                try:
+                    self.num_timesteps = temp['num_timesteps']  
+                except KeyError:
+                    self.num_timesteps = temp['num_grids'] 
             super(TemporalGrid , self).__init__(*args, **kwargs)
         else:
             self.num_timesteps = args[2]

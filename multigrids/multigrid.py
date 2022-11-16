@@ -682,7 +682,7 @@ class MultiGrid (object):
                 config['mode'], 
                 config['data_type'], 
                 config['memory_shape'],
-                config['verbose']
+                config['verbose'] if 'verbose' in config else False,
             )
             # config['filename '] = filename
 
