@@ -1,4 +1,4 @@
-"""
+q"""
 Multigrid
 ---------
 
@@ -17,7 +17,7 @@ import yaml
 import numpy as np
 import matplotlib.pyplot as plt
 try: 
-    import gdal
+    from osgeo import gdal
 except ImportError:
     gdal = None
 
@@ -205,6 +205,7 @@ class MultiGrid (object):
                 }
 
         if not 'grid_name_map' in self.config:
+            kwargs['num_grids'] = self.config['num_grids']
             self.configure_grid_name_map(kwargs)
         
         if 'save_to' in kwargs and not kwargs['save_to'] is None:
@@ -496,7 +497,8 @@ class MultiGrid (object):
             file = self.config['dataset_name'].lower().replace(' ','_') + '.yml'
 
         s_config = copy.deepcopy(self.config)
-        del(s_config['verbose'])
+        if 'vebose' in s_config:
+            del(s_config['verbose'])
 
         try:
             path, grid_file = os.path.split(file)
@@ -1134,7 +1136,15 @@ class MultiGrid (object):
     def save_as_geotiff(self, filename, grid_id, **kwargs):
         """save a grid as a tiff file
 
-        TODO: fix datatype
+        Parmaeters
+        ----------
+        filename: str
+        grid_id: any
+            key type is determined by grid type, ussally a value in grid_name_map
+            of a str
+        kwargs:
+            reserved
+
         """
         if gdal is None:
             raise IOError("gdal not found: cannot save tif")
@@ -1150,10 +1160,8 @@ class MultiGrid (object):
         except KeyError:
             raise IOError("No Raster Metadata Found: cannot save tiff")
         
-        datatype = gdal.GDT_Float32
-
-
-        data = self[grid_id].astype(np.float32)
+        datatype = raster.numpy_type_lookup(self.grids.dtype)#gdal.GDT_Float32
+        data = self[grid_id].astype(self.grids.dtype)
 
         raster.save_raster(filename, data, transform, projection, datatype)
 
@@ -1368,7 +1376,8 @@ class MultiGrid (object):
         return view
 
     def clip_to_shape(
-            self, shape, name='subarea', temp_dir='./temp', warp_options = {}
+            self, shape, name='subarea', temp_dir='./temp', warp_options = {},
+            out_dir = './', verbose=False, force=False, keep_temp_clipped=False
         ):
         """Clip the grid to a shape (from a vector file) using gdal warp
 
@@ -1382,24 +1391,50 @@ class MultiGrid (object):
             path to store temp data at
         warp_options:
             Options to pass to gdal warp
+        out_dir:
+        verbose: bool
+        force: bool, default false
+            If True will overwrite existing data in temp_dir
+        keep_temp_clipped: bool, default false
+            If True, keep temp clipped files on disk
 
         Returns
         -------
         multigrid.Multigrid
         """
         from .tools import load_and_create
-        os.makedirs(temp_dir)
-    
-        self.save_all_as_geotiff(temp_dir, **{'base_filename':'full'})
+        try:
+            os.makedirs(temp_dir)
+        except IOError as e:
+            if not force: raise IOError(e)
 
-        files = sorted(glob.glob(os.path.join(temp_dir, 'full*.tif')))
+        # self.save_all_as_geotiff(temp_dir, **{'base_filename':'full'})
+
+        for idx, ts in enumerate(self.timestep_range()):
+            if verbose: print(idx,ts)
+            full_file = os.path.join(
+                temp_dir, 
+                ( 'full_' + str(ts) + '.tif').replace(' ','_')
+            )
+            self.save_as_geotiff(full_file, ts)
+
+
+            clipped_file = os.path.join(temp_dir, '%s_%s.tif' % (name, ts) )
+            raster.clip_polygon_raster(
+                full_file, clipped_file, shape, **warp_options
+            )
+            os.remove(full_file)
+
+
+        # files = sorted(glob.glob(os.path.join(temp_dir, 'full*.tif')))
         # return 
-        for idx, in_file in enumerate(files):
-            out_file = os.path.join(temp_dir, '%s_%i.tif' % (name, idx) )
+        # for idx, in_file in enumerate(files):
+        #     print(idx, in_file)
+        #     out_file = os.path.join(temp_dir, '%s_%05i.tif' % (name, idx) )
+        #     # print(out_file)
+        #     raster.clip_polygon_raster(in_file, out_file, shape, **warp_options)
             
-            raster.clip_polygon_raster(in_file, out_file, shape, **warp_options)
-
-            os.remove(in_file)
+        #     os.remove(in_file)
 
         files = sorted(glob.glob(os.path.join(temp_dir,'%s*.tif' % name)))
         md = raster.load_raster(files[0])[1]
@@ -1417,16 +1452,19 @@ class MultiGrid (object):
             'grid_names': list(self.config['grid_name_map'].keys()), 
             'start_timestep': 
                 self.config['start_timestep'] if 'start_timestep' in self.config else None, 
-            'raster_metadata': md
+            'raster_metadata': md,
+            'delta_timestep': self.config['delta_timestep'] if 'delta_timestep' in self.config else None, 
+            'filename': os.path.join(out_dir,'%s.grids.data' % name)
         }
 
         rv = load_and_create(lp, cp)
-        
-        files = sorted(glob.glob(os.path.join(temp_dir,'*')))
-        for file in files:
+        rv.config['raster_metadata'] = md
+        if not keep_temp_clipped:
+            files = sorted(glob.glob(os.path.join(temp_dir,'*')))
+            for file in files:
             os.remove(file)
 
-        os.rmdir(temp_dir)
+            os.rmdir(temp_dir)
         return rv 
         
     def zoom_to(
