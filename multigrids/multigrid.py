@@ -17,7 +17,7 @@ import yaml
 import numpy as np
 import matplotlib.pyplot as plt
 try: 
-    import gdal
+    from osgeo import gdal
 except ImportError:
     gdal = None
 
@@ -1417,7 +1417,8 @@ class MultiGrid (object):
             'grid_names': list(self.config['grid_name_map'].keys()), 
             'start_timestep': 
                 self.config['start_timestep'] if 'start_timestep' in self.config else None, 
-            'raster_metadata': md
+            'raster_metadata': md,
+            'delta_timestep': self.config['start_timestep'] if 'start_timestep' in self.config else 1, 
         }
 
         rv = load_and_create(lp, cp)
