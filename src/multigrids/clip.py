@@ -10,7 +10,7 @@ import tempfile
 import os
 import shutil
 
-from .import errors
+from . import errors
 
 try:
     import moviepy.editor as mpe

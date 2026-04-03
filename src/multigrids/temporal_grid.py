@@ -1,4 +1,3 @@
-from tkinter import N
 from .multigrid import MultiGrid
 import numpy as np
 import yaml

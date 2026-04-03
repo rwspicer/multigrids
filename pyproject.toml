@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multigrids"
+dynamic = ["version", "readme"]
+license = {file = "LICENSE.txt"}
+description = 'multigrids'
+requires-python = ">=3.12"
+keywords = []
+authors = [
+  { name = "Rawser Spicer", email = "rwspicer@alaska.edu" },
+]
+maintainers = [
+  { name = "Rawser Spicer", email = "rwspicer@alaska.edu" }
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
+dependencies = [
+  # "numpy",
+  # "pandas=2.2.3",
+  # "python=3.12.9",
+  # "pyyaml"
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "multigrids.__version__"} 
+readme = {file = ["README.md"]}
+
+[project.urls]
+Homepage = "https://github.com/rwspicer/multigrids"
+
+
+# [project.scripts]
+# FLUXPRO = "fluxpro.cli.main:app"
